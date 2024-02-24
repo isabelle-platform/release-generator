@@ -115,6 +115,7 @@ function download_datagen() {
 function load_core() {
 	local login="$1"
 	local password="$2"
+	local flavour="$3"
 	local wgetrc="$(pwd)/.wgetrc"
 
 	mkdir -p core
@@ -122,6 +123,7 @@ function load_core() {
         WGETRC="${wgetrc}" wget -O core.tar.xz "$url_core" || fail "Failed to get Core"
         tar xvf core.tar.xz
         rm core.tar.xz
+        mv isabelle-core ${flavour}-core
     popd > /dev/null
 
 	return 0
@@ -219,7 +221,7 @@ pushd "${out_dir}" > /dev/null
 	mkdir -p distr
 	pushd distr > /dev/null
 		put_wget_creds "$releases_login" "$releases_password"
-		load_core "${gh_login}" "${gh_password}"
+		load_core "${gh_login}" "${gh_password}" "${flavour}"
 		load_gc
 		load_ui "${flavour}"
 		release_wget_creds
