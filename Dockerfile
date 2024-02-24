@@ -6,5 +6,5 @@ RUN mkdir -p /home/root
 ENV HOME="/home/root"
 
 RUN apt-get update && \
-    apt-get install -y build-essential cargo curl git libssl-dev pkg-config
+    apt-get install -y build-essential cargo curl git libssl-dev pkg-config wget
 
