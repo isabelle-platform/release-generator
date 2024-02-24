@@ -147,7 +147,7 @@ function write_flavour() {
 }
 
 function write_release() {
-	tar cJvf release.tar.xz *
+	tar cJvf release.tar.xz .flavour *
 	return 0
 }
 
