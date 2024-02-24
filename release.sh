@@ -141,6 +141,16 @@ function load_ui() {
 	return 0
 }
 
+function write_flavour() {
+	echo "$1" > .flavour
+	return 0
+}
+
+function write_release() {
+	tar cJvf release.tar.xz *
+	return 0
+}
+
 test_empty_fail "$gh_login"
 test_empty_fail "$gh_password"
 test_empty_fail "$releases_login"
@@ -156,4 +166,6 @@ pushd "${out_dir}" > /dev/null
 	load_gc
 	load_ui "${flavour}"
 	release_wget_creds
+	write_flavour "${flavour}"
+	write_release
 popd > /dev/null
