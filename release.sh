@@ -49,6 +49,8 @@ url_ui_equestrian="https://releases.interpretica.io/isabelle-ui/branches/main/is
 url_datagen_intranet="https://${gh_login}:${gh_password}@github.com/intranet-platform/intranet-data-gen.git"
 url_ui_intranet="https://releases.interpretica.io/intranet/branches/main/intranet-main-latest-wasm.tar.xz"
 
+url_scripts="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-scripts.git"
+
 function test_empty_fail() {
 	local var="$1"
 
@@ -57,6 +59,11 @@ function test_empty_fail() {
 		exit 1
 	fi
 	return 0
+}
+
+function fail() {
+	echo $@ >&2
+	exit 1
 }
 
 function test_flavour() {
@@ -84,6 +91,27 @@ function release_wget_creds() {
 	rm $(pwd)/.wgetrc
 }
 
+function download_datagen() {
+	local flavour="$1"
+	local target_data_gen
+
+	case "$flavour" in
+	    equestrian)
+	        target_data_gen="$url_datagen_equestrian"
+	        ;;
+	    intranet)
+	        target_data_gen="$url_datagen_intranet"
+	        ;;
+	    *)
+	        echo "Unknown flavour: $flavour" >&2
+	        exit 1
+	esac
+
+	rm -rf datagen
+	git clone "${target_data_gen}" datagen || fail "Failed to clone Data Generator"
+	return 0
+}
+
 function load_core() {
 	local login="$1"
 	local password="$2"
@@ -91,7 +119,7 @@ function load_core() {
 
 	mkdir -p core
     pushd core > /dev/null
-        WGETRC="${wgetrc}" wget -O core.tar.xz "$url_core"
+        WGETRC="${wgetrc}" wget -O core.tar.xz "$url_core" || fail "Failed to get Core"
         tar xvf core.tar.xz
         rm core.tar.xz
     popd > /dev/null
@@ -106,7 +134,7 @@ function load_gc() {
 
 	mkdir -p core
     pushd core > /dev/null
-    	git clone ${url_gc} isabelle-gc
+        git clone ${url_gc} isabelle-gc || fail "Failed to get isabelle-gc"
     popd > /dev/null
 
 	return 0
@@ -115,15 +143,13 @@ function load_gc() {
 function load_ui() {
 	local flavour="$1"
 	local wgetrc="$(pwd)/.wgetrc"
+	local target_ui
 
-	# Choose flavour
 	case "$flavour" in
 	    equestrian)
-	        target_data_gen="$url_datagen_equestrian"
 	        target_ui="$url_ui_equestrian"
 	        ;;
 	    intranet)
-	        target_data_gen="$url_datagen_intranet"
 	        target_ui="$url_ui_intranet"
 	        ;;
 	    *)
@@ -133,11 +159,38 @@ function load_ui() {
 
 	mkdir -p ui
 	pushd ui > /dev/null
-		WGETRC="${wgetrc}" wget -O ui.tar.xz "${target_ui}"
+		WGETRC="${wgetrc}" wget -O ui.tar.xz "${target_ui}" || fail "Failed to get UI"
 		tar xvf ui.tar.xz
 		rm ui.tar.xz
 	popd > /dev/null
 
+	return 0
+}
+
+function create_data() {
+	mkdir -p data
+	pushd data > /dev/null
+	mkdir -p database
+	popd > /dev/null
+}
+
+function create_scripts() {
+	git clone "${url_scripts}" scripts || fail "Failed to get scripts"
+	echo > scripts/.in_release
+}
+
+function generate_default() {
+	mkdir -p data/default
+	pushd data/default > /dev/null
+		${TOP_DIR}/datagen/generate.sh "$(pwd)"
+	popd > /dev/null
+	return 0
+}
+
+function generate_raw() {
+	local default_dir="$(pwd)/data/default"
+	cp -r "${default_dir}" "$(pwd)/data/raw"
+	touch "$(pwd)/data/raw/.firstrun"
 	return 0
 }
 
@@ -159,13 +212,25 @@ test_empty_fail "$out_dir"
 test_empty_fail "$flavour"
 test_flavour "$flavour"
 
+download_datagen "$flavour"
+
 mkdir -p "${out_dir}"
 pushd "${out_dir}" > /dev/null
-	put_wget_creds "$releases_login" "$releases_password"
-	load_core "${gh_login}" "${gh_password}"
-	load_gc
-	load_ui "${flavour}"
-	release_wget_creds
+	mkdir -p distr
+	pushd distr > /dev/null
+		put_wget_creds "$releases_login" "$releases_password"
+		load_core "${gh_login}" "${gh_password}"
+		load_gc
+		load_ui "${flavour}"
+		release_wget_creds
+	popd > /dev/null
+
+	create_data
+	generate_default "${flavour}"
+	generate_raw
+
+	create_scripts
+
 	write_flavour "${flavour}"
 	write_release
 popd > /dev/null
