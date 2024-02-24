@@ -54,7 +54,7 @@ pipeline {
                          paramPublish: null,
                          publishers: [
                           [
-                            configName: '$,
+                            configName: "${params.FTP_CONFIG}",
                             transfers:
                               [[
                                 asciiMode: false,
