@@ -192,7 +192,6 @@ function generate_default() {
 function generate_raw() {
 	local default_dir="$(pwd)/data/default"
 	cp -r "${default_dir}" "$(pwd)/data/raw"
-	touch "$(pwd)/data/raw/.firstrun"
 	return 0
 }
 
