@@ -170,6 +170,42 @@ function load_ui() {
 	return 0
 }
 
+function load_plugin() {
+	local wgetrc="$1"
+	local url="$2"
+
+	mkdir -p core
+	pushd core > /dev/null
+		WGETRC="${wgetrc}" wget -O plugin.tar.xz "${url}" || fail "Failed to get plugin"
+		tar xvf plugin.tar.xz
+		rm plugin.tar.xz
+	popd > /dev/null
+
+	return 0
+}
+
+function load_plugins() {
+	local flavour="$1"
+	local wgetrc="$(pwd)/.wgetrc"
+
+	load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-security/branches/main/isabelle-plugin-security-main-latest-linux-x86_64.tar.xz"
+
+	case "$flavour" in
+	    equestrian)
+	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-equestrian/branches/main/isabelle-plugin-equestrian-main-latest-linux-x86_64.tar.xz"
+	        ;;
+	    intranet)
+	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-intranet/branches/main/isabelle-plugin-intranet-main-latest-linux-x86_64.tar.xz"
+	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-web/branches/main/isabelle-plugin-web-main-latest-linux-x86_64.tar.xz"
+	        ;;
+	    *)
+	        echo "Unknown flavour: $flavour" >&2
+	        exit 1
+	esac
+
+	return 0
+}
+
 function create_data() {
 	mkdir -p data
 	pushd data > /dev/null
@@ -225,6 +261,7 @@ pushd "${out_dir}" > /dev/null
 		load_core "${gh_login}" "${gh_password}" "${flavour}"
 		load_gc
 		load_ui "${flavour}"
+		load_plugins "${flavour}"
 		release_wget_creds
 	popd > /dev/null
 
