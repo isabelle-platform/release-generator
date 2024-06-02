@@ -137,6 +137,7 @@ function load_gc() {
 	mkdir -p core
     pushd core > /dev/null
         git clone ${url_gc} isabelle-gc || fail "Failed to get isabelle-gc"
+        rm -rf isabelle-gc/.git
     popd > /dev/null
 
 	return 0
@@ -178,6 +179,7 @@ function create_data() {
 
 function create_scripts() {
 	git clone "${url_scripts}" scripts || fail "Failed to get scripts"
+	rm -rf scripts/.git
 	echo > scripts/.in_release
 }
 
