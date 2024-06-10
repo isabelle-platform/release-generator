@@ -46,6 +46,8 @@ url_core="https://releases.interpretica.io/isabelle-core/branches/main/isabelle-
 url_gc="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-gc.git"
 url_datagen_equestrian="https://${gh_login}:${gh_password}@github.com/isabelle-platform/equestrian-data-gen.git"
 url_ui_equestrian="https://releases.interpretica.io/isabelle-ui/branches/main/isabelle-ui-main-latest-wasm.tar.xz"
+url_datagen_sample="https://${gh_login}:${gh_password}@github.com/isabelle-platform/sample-data-gen.git"
+url_ui_sample="https://releases.interpretica.io/sample-ui/branches/main/sample-ui-main-latest-wasm.tar.xz"
 url_datagen_intranet="https://${gh_login}:${gh_password}@github.com/intranet-platform/intranet-data-gen.git"
 url_ui_intranet="https://releases.interpretica.io/intranet/branches/main/intranet-main-latest-wasm.tar.xz"
 
@@ -68,7 +70,7 @@ function fail() {
 
 function test_flavour() {
 	case "$1" in
-		equestrian|intranet)
+		equestrian|intranet|sample)
 			;;
 		*)
 			echo "Unknown flavour: $1" >&2
@@ -98,6 +100,9 @@ function download_datagen() {
 	case "$flavour" in
 	    equestrian)
 	        target_data_gen="$url_datagen_equestrian"
+	        ;;
+	    sample)
+	        target_data_gen="$url_datagen_sample"
 	        ;;
 	    intranet)
 	        target_data_gen="$url_datagen_intranet"
@@ -152,6 +157,9 @@ function load_ui() {
 	    equestrian)
 	        target_ui="$url_ui_equestrian"
 	        ;;
+	    sample)
+	        target_ui="$url_ui_sample"
+	        ;;
 	    intranet)
 	        target_ui="$url_ui_intranet"
 	        ;;
@@ -194,6 +202,8 @@ function load_plugins() {
 	    equestrian)
 	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-equestrian/branches/main/isabelle-plugin-equestrian-main-latest-linux-x86_64.tar.xz"
 	        ;;
+	    sample)
+			;;
 	    intranet)
 	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-intranet/branches/main/isabelle-plugin-intranet-main-latest-linux-x86_64.tar.xz"
 	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-web/branches/main/isabelle-plugin-web-main-latest-linux-x86_64.tar.xz"
