@@ -50,6 +50,8 @@ url_datagen_sample="https://${gh_login}:${gh_password}@github.com/isabelle-platf
 url_ui_sample="https://releases.interpretica.io/sample-ui/branches/main/sample-ui-main-latest-wasm.tar.xz"
 url_datagen_intranet="https://${gh_login}:${gh_password}@github.com/intranet-platform/intranet-data-gen.git"
 url_ui_intranet="https://releases.interpretica.io/intranet/branches/main/intranet-main-latest-wasm.tar.xz"
+url_datagen_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-data-gen.git"
+url_ui_cloudcpe="https://releases.interpretica.io/cloudcpe-ui/branches/main/cloudcpe-main-latest-wasm.tar.xz"
 
 url_scripts="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-scripts.git"
 
@@ -107,6 +109,9 @@ function download_datagen() {
 	    intranet)
 	        target_data_gen="$url_datagen_intranet"
 	        ;;
+	    cloudcpe)
+	        target_data_gen="$url_datagen_cloudcpe"
+	        ;;
 	    *)
 	        echo "Unknown flavour: $flavour" >&2
 	        exit 1
@@ -163,6 +168,9 @@ function load_ui() {
 	    intranet)
 	        target_ui="$url_ui_intranet"
 	        ;;
+	    cloudcpe)
+			target_ui="$url_ui_cloudcpe"
+			;;
 	    *)
 	        echo "Unknown flavour: $flavour" >&2
 	        exit 1
@@ -207,6 +215,9 @@ function load_plugins() {
 	    intranet)
 	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-intranet/branches/main/isabelle-plugin-intranet-main-latest-linux-x86_64.tar.xz"
 	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-web/branches/main/isabelle-plugin-web-main-latest-linux-x86_64.tar.xz"
+	        ;;
+	    cloudcpe)
+	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-cloudcpe/branches/main/isabelle-plugin-cloudcpe-main-latest-linux-x86_64.tar.xz"
 	        ;;
 	    *)
 	        echo "Unknown flavour: $flavour" >&2
