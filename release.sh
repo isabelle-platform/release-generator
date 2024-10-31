@@ -72,7 +72,7 @@ function fail() {
 
 function test_flavour() {
 	case "$1" in
-		equestrian|intranet|sample)
+		equestrian|intranet|sample|cloudcpe)
 			;;
 		*)
 			echo "Unknown flavour: $1" >&2
