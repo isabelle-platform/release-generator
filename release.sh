@@ -51,7 +51,7 @@ url_ui_sample="https://releases.interpretica.io/sample-ui/branches/main/sample-u
 url_datagen_intranet="https://${gh_login}:${gh_password}@github.com/intranet-platform/intranet-data-gen.git"
 url_ui_intranet="https://releases.interpretica.io/intranet/branches/main/intranet-main-latest-wasm.tar.xz"
 url_datagen_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-data-gen.git"
-url_ui_cloudcpe="https://releases.interpretica.io/cloudcpe-ui/branches/main/cloudcpe-main-latest-wasm.tar.xz"
+url_ui_cloudcpe="https://releases.interpretica.io/cloudcpe-ui/branches/main/cloudcpe-ui-main-latest-wasm.tar.xz"
 
 url_scripts="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-scripts.git"
 
