@@ -52,6 +52,8 @@ url_datagen_intranet="https://${gh_login}:${gh_password}@github.com/intranet-pla
 url_ui_intranet="https://releases.interpretica.io/intranet/branches/main/intranet-main-latest-wasm.tar.xz"
 url_datagen_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-data-gen.git"
 url_ui_cloudcpe="https://releases.interpretica.io/cloudcpe-ui/branches/main/cloudcpe-ui-main-latest-wasm.tar.xz"
+url_datagen_didactist="https://${gh_login}:${gh_password}@github.com/isabelle-platform/didactist-data-gen.git"
+url_ui_didactist=""
 
 url_scripts="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-scripts.git"
 
@@ -72,7 +74,7 @@ function fail() {
 
 function test_flavour() {
 	case "$1" in
-		equestrian|intranet|sample|cloudcpe)
+		equestrian|intranet|sample|cloudcpe|didactist)
 			;;
 		*)
 			echo "Unknown flavour: $1" >&2
@@ -111,6 +113,9 @@ function download_datagen() {
 	        ;;
 	    cloudcpe)
 	        target_data_gen="$url_datagen_cloudcpe"
+	        ;;
+	    didactist)
+	        target_data_gen="$url_datagen_didactist"
 	        ;;
 	    *)
 	        echo "Unknown flavour: $flavour" >&2
@@ -171,17 +176,22 @@ function load_ui() {
 	    cloudcpe)
 			target_ui="$url_ui_cloudcpe"
 			;;
+		didactist)
+			target_ui="$url_ui_didactist"
+			;;
 	    *)
 	        echo "Unknown flavour: $flavour" >&2
 	        exit 1
 	esac
 
 	mkdir -p ui
-	pushd ui > /dev/null
-		WGETRC="${wgetrc}" wget -O ui.tar.xz "${target_ui}" || fail "Failed to get UI"
-		tar xvf ui.tar.xz
-		rm ui.tar.xz
-	popd > /dev/null
+	if [ "${target_ui}" != "" ] ; then
+		pushd ui > /dev/null
+			WGETRC="${wgetrc}" wget -O ui.tar.xz "${target_ui}" || fail "Failed to get UI"
+			tar xvf ui.tar.xz
+			rm ui.tar.xz
+		popd > /dev/null
+	fi
 
 	return 0
 }
@@ -218,6 +228,9 @@ function load_plugins() {
 	        ;;
 	    cloudcpe)
 	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-cloudcpe/branches/main/isabelle-plugin-cloudcpe-main-latest-linux-x86_64.tar.xz"
+	        ;;
+	    didactist)
+	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-didactist/branches/main/isabelle-plugin-didactist-main-latest-linux-x86_64.tar.xz"
 	        ;;
 	    *)
 	        echo "Unknown flavour: $flavour" >&2
