@@ -7,6 +7,7 @@ gh_login=""
 gh_password=""
 out_dir=""
 flavour=""
+args="$@"
 
 while test -n "$1" ; do
     case "$1" in
@@ -27,17 +28,17 @@ while test -n "$1" ; do
             shift 1
             ;;
         --out)
-			out_dir="$2"
-			shift 1
-			;;
-		--flavour)
-			flavour="$2"
-			shift 1
-			;;
-		*)
-			echo "Unknown argument: $1" >&2
-			exit 1
-			;;
+            out_dir="$2"
+            shift 1
+            ;;
+        --flavour)
+            flavour="$2"
+            shift 1
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 1
+            ;;
     esac
     shift 1
 done
@@ -52,88 +53,91 @@ url_datagen_intranet="https://${gh_login}:${gh_password}@github.com/intranet-pla
 url_ui_intranet="https://releases.interpretica.io/intranet/branches/main/intranet-main-latest-wasm.tar.xz"
 url_datagen_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-data-gen.git"
 url_ui_cloudcpe="https://releases.interpretica.io/cloudcpe-ui/branches/main/cloudcpe-ui-main-latest-wasm.tar.xz"
+url_extras_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-extras.git"
 url_datagen_didactist="https://${gh_login}:${gh_password}@github.com/isabelle-platform/didactist-data-gen.git"
 url_ui_didactist=""
 
 url_scripts="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-scripts.git"
 
 function test_empty_fail() {
-	local var="$1"
+    local var="$1"
 
-	if [ "$var" == "" ] ; then
-		echo "Input variable is empty"
-		exit 1
-	fi
-	return 0
+    if [ "$var" == "" ] ; then
+        echo "Input variable is empty"
+        exit 1
+    fi
+    return 0
 }
 
 function fail() {
-	echo $@ >&2
-	exit 1
+    echo $@ >&2
+    exit 1
 }
 
 function test_flavour() {
-	case "$1" in
-		equestrian|intranet|sample|cloudcpe|didactist)
-			;;
-		*)
-			echo "Unknown flavour: $1" >&2
-			exit 1
-	esac
-	return 0
+    case "$1" in
+        equestrian|intranet|sample|cloudcpe|didactist)
+            ;;
+        *)
+            echo "Unknown flavour: $1" >&2
+            exit 1
+    esac
+    return 0
 }
 
 function put_wget_creds() {
-	local releases_login="$1"
-	local releases_password="$2"
+    local releases_login="$1"
+    local releases_password="$2"
 
-	touch $(pwd)/.wgetrc
-	chmod 600 $(pwd)/.wgetrc
-	echo "user=$releases_login" > $(pwd)/.wgetrc
-	echo "password=$releases_password" >> $(pwd)/.wgetrc
+    touch $(pwd)/.wgetrc
+    chmod 600 $(pwd)/.wgetrc
+    echo "user=$releases_login" > $(pwd)/.wgetrc
+    echo "password=$releases_password" >> $(pwd)/.wgetrc
+    export WGETRC_PATH="$(pwd)/.wgetrc"
+    echo "Put credentials to ${WGETRC_PATH}"
 }
 
 function release_wget_creds() {
-	rm $(pwd)/.wgetrc
+    rm $(pwd)/.wgetrc
 }
 
 function download_datagen() {
-	local flavour="$1"
-	local target_data_gen
+    local flavour="$1"
+    local target_data_gen
 
-	case "$flavour" in
-	    equestrian)
-	        target_data_gen="$url_datagen_equestrian"
-	        ;;
-	    sample)
-	        target_data_gen="$url_datagen_sample"
-	        ;;
-	    intranet)
-	        target_data_gen="$url_datagen_intranet"
-	        ;;
-	    cloudcpe)
-	        target_data_gen="$url_datagen_cloudcpe"
-	        ;;
-	    didactist)
-	        target_data_gen="$url_datagen_didactist"
-	        ;;
-	    *)
-	        echo "Unknown flavour: $flavour" >&2
-	        exit 1
-	esac
+    case "$flavour" in
+        equestrian)
+            target_data_gen="$url_datagen_equestrian"
+            ;;
+        sample)
+            target_data_gen="$url_datagen_sample"
+            ;;
+        intranet)
+            target_data_gen="$url_datagen_intranet"
+            ;;
+        cloudcpe)
+            target_data_gen="$url_datagen_cloudcpe"
+            ;;
+        didactist)
+            target_data_gen="$url_datagen_didactist"
+            ;;
+        *)
+            echo "Unknown flavour: $flavour" >&2
+            exit 1
+    esac
 
-	rm -rf datagen
-	git clone "${target_data_gen}" datagen || fail "Failed to clone Data Generator"
-	return 0
+    rm -rf datagen
+    git clone "${target_data_gen}" datagen || fail "Failed to clone Data Generator"
+    return 0
 }
 
 function load_core() {
-	local login="$1"
-	local password="$2"
-	local flavour="$3"
-	local wgetrc="$(pwd)/.wgetrc"
+    local login="$1"
+    local password="$2"
+    local flavour="$3"
+    local wgetrc="${WGETRC_PATH}"
 
-	mkdir -p core
+    mkdir -p core
     pushd core > /dev/null
         WGETRC="${wgetrc}" wget -O core.tar.xz "$url_core" || fail "Failed to get Core"
         tar xvf core.tar.xz
@@ -141,140 +145,195 @@ function load_core() {
         mv isabelle-core ${flavour}-core
     popd > /dev/null
 
-	return 0
+    return 0
 }
 
 function load_gc() {
-	local login="$1"
-	local password="$2"
-	local wgetrc="$(pwd)/.wgetrc"
+    local login="$1"
+    local password="$2"
+    local wgetrc="${WGETRC_PATH}"
 
-	mkdir -p core
+    mkdir -p core
     pushd core > /dev/null
-        git clone ${url_gc} isabelle-gc || fail "Failed to get isabelle-gc"
-        rm -rf isabelle-gc/.git
+        if [ ! -d isabelle-gc ] ; then
+            git clone ${url_gc} isabelle-gc || fail "Failed to get isabelle-gc"
+            rm -rf isabelle-gc/.git
+        fi
     popd > /dev/null
 
-	return 0
+    return 0
 }
 
 function load_ui() {
-	local flavour="$1"
-	local wgetrc="$(pwd)/.wgetrc"
-	local target_ui
+    local flavour="$1"
+    local wgetrc="${WGETRC_PATH}"
+    local target_ui
 
-	case "$flavour" in
-	    equestrian)
-	        target_ui="$url_ui_equestrian"
-	        ;;
-	    sample)
-	        target_ui="$url_ui_sample"
-	        ;;
-	    intranet)
-	        target_ui="$url_ui_intranet"
-	        ;;
-	    cloudcpe)
-			target_ui="$url_ui_cloudcpe"
-			;;
-		didactist)
-			target_ui="$url_ui_didactist"
-			;;
-	    *)
-	        echo "Unknown flavour: $flavour" >&2
-	        exit 1
-	esac
+    case "$flavour" in
+        equestrian)
+            target_ui="$url_ui_equestrian"
+            ;;
+        sample)
+            target_ui="$url_ui_sample"
+            ;;
+        intranet)
+            target_ui="$url_ui_intranet"
+            ;;
+        cloudcpe)
+            target_ui="$url_ui_cloudcpe"
+            ;;
+        didactist)
+            target_ui="$url_ui_didactist"
+            ;;
+        *)
+            echo "Unknown flavour: $flavour" >&2
+            exit 1
+    esac
 
-	mkdir -p ui
-	if [ "${target_ui}" != "" ] ; then
-		pushd ui > /dev/null
-			WGETRC="${wgetrc}" wget -O ui.tar.xz "${target_ui}" || fail "Failed to get UI"
-			tar xvf ui.tar.xz
-			rm ui.tar.xz
-		popd > /dev/null
-	fi
+    mkdir -p ui
+    if [ "${target_ui}" != "" ] ; then
+        pushd ui > /dev/null
+            WGETRC="${wgetrc}" wget -O ui.tar.xz "${target_ui}" || fail "Failed to get UI"
+            tar xvf ui.tar.xz
+            rm ui.tar.xz
+        popd > /dev/null
+    fi
 
-	return 0
+    return 0
+}
+
+function load_extras() {
+    local target_extras
+
+    case "$flavour" in
+        equestrian)
+            target_extras=""
+            ;;
+        sample)
+            target_extras=""
+            ;;
+        intranet)
+            target_extras=""
+            ;;
+        cloudcpe)
+            target_extras="$url_extras_cloudcpe"
+            ;;
+        didactist)
+            target_extras=""
+            ;;
+        *)
+            echo "Unknown flavour: $flavour" >&2
+            exit 1
+    esac
+
+    if [ "$target_extras" == "" ] ; then
+        return 0
+    fi
+
+    if [ ! -d extras ] ; then
+        git clone ${target_extras} extras || fail "Failed to get extras"
+        rm -rf extras/.git
+    fi
+
+    ./extras/extras.sh "$@"
+
+    return 0
+}
+
+function install_extras() {
+    mkdir -p "${out_dir}/scripts/extras"
+    if [ -d extras/deploy ] ; then
+        cp -R extras/deploy ${out_dir}/scripts/extras
+    fi
+    if [ -d extras/service ] ; then
+        cp -R extras/service ${out_dir}/scripts/extras/
+    fi
+    if [ -d extras/nginx ] ; then
+        cp -R extras/nginx ${out_dir}/scripts/extras/
+    fi
 }
 
 function load_plugin() {
-	local wgetrc="$1"
-	local url="$2"
+    local wgetrc="$1"
+    local url="$2"
 
-	mkdir -p core
-	pushd core > /dev/null
-		WGETRC="${wgetrc}" wget -O plugin.tar.xz "${url}" || fail "Failed to get plugin"
-		tar xvf plugin.tar.xz
-		rm plugin.tar.xz
-	popd > /dev/null
+    mkdir -p core
+    pushd core > /dev/null
+        WGETRC="${wgetrc}" wget -O plugin.tar.xz "${url}" || fail "Failed to get plugin"
+        tar xvf plugin.tar.xz
+        rm plugin.tar.xz
+    popd > /dev/null
 
-	return 0
+    return 0
 }
 
 function load_plugins() {
-	local flavour="$1"
-	local wgetrc="$(pwd)/.wgetrc"
+    local flavour="$1"
+    local wgetrc="${WGETRC_PATH}"
 
-	load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-security/branches/main/isabelle-plugin-security-main-latest-linux-x86_64.tar.xz"
+    load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-security/branches/main/isabelle-plugin-security-main-latest-linux-x86_64.tar.xz"
 
-	case "$flavour" in
-	    equestrian)
-	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-equestrian/branches/main/isabelle-plugin-equestrian-main-latest-linux-x86_64.tar.xz"
-	        ;;
-	    sample)
-			;;
-	    intranet)
-	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-intranet/branches/main/isabelle-plugin-intranet-main-latest-linux-x86_64.tar.xz"
-	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-web/branches/main/isabelle-plugin-web-main-latest-linux-x86_64.tar.xz"
-	        ;;
-	    cloudcpe)
-	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-cloudcpe/branches/main/isabelle-plugin-cloudcpe-main-latest-linux-x86_64.tar.xz"
-	        ;;
-	    didactist)
-	        load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-didactist/branches/main/isabelle-plugin-didactist-main-latest-linux-x86_64.tar.xz"
-	        ;;
-	    *)
-	        echo "Unknown flavour: $flavour" >&2
-	        exit 1
-	esac
+    case "$flavour" in
+        equestrian)
+            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-equestrian/branches/main/isabelle-plugin-equestrian-main-latest-linux-x86_64.tar.xz"
+            ;;
+        sample)
+            ;;
+        intranet)
+            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-intranet/branches/main/isabelle-plugin-intranet-main-latest-linux-x86_64.tar.xz"
+            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-web/branches/main/isabelle-plugin-web-main-latest-linux-x86_64.tar.xz"
+            ;;
+        cloudcpe)
+            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-cloudcpe/branches/main/isabelle-plugin-cloudcpe-main-latest-linux-x86_64.tar.xz"
+            ;;
+        didactist)
+            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-didactist/branches/main/isabelle-plugin-didactist-main-latest-linux-x86_64.tar.xz"
+            ;;
+        *)
+            echo "Unknown flavour: $flavour" >&2
+            exit 1
+    esac
 
-	return 0
+    return 0
 }
 
 function create_data() {
-	mkdir -p data
-	pushd data > /dev/null
-	mkdir -p database
-	popd > /dev/null
+    mkdir -p data
+    pushd data > /dev/null
+    mkdir -p database
+    popd > /dev/null
 }
 
 function create_scripts() {
-	git clone "${url_scripts}" scripts || fail "Failed to get scripts"
-	rm -rf scripts/.git
-	echo > scripts/.in_release
+    if [ ! -d scripts ] ; then
+        git clone "${url_scripts}" scripts || fail "Failed to get scripts"
+        rm -rf scripts/.git
+    fi
+    echo > scripts/.in_release
 }
 
 function generate_default() {
-	mkdir -p data/default
-	pushd data/default > /dev/null
-		${TOP_DIR}/datagen/generate.sh "$(pwd)"
-	popd > /dev/null
-	return 0
+    mkdir -p data/default
+    pushd data/default > /dev/null
+        ${TOP_DIR}/datagen/generate.sh "$(pwd)"
+    popd > /dev/null
+    return 0
 }
 
 function generate_raw() {
-	local default_dir="$(pwd)/data/default"
-	cp -r "${default_dir}" "$(pwd)/data/raw"
-	return 0
+    local default_dir="$(pwd)/data/default"
+    cp -r "${default_dir}" "$(pwd)/data/raw"
+    return 0
 }
 
 function write_flavour() {
-	echo "$1" > .flavour
-	return 0
+    echo "$1" > .flavour
+    return 0
 }
 
 function write_release() {
-	tar cJvf release.tar.xz .flavour *
-	return 0
+    tar cJvf release.tar.xz .flavour *
+    return 0
 }
 
 test_empty_fail "$gh_login"
@@ -287,24 +346,30 @@ test_flavour "$flavour"
 
 download_datagen "$flavour"
 
+put_wget_creds "$releases_login" "$releases_password"
 mkdir -p "${out_dir}"
 pushd "${out_dir}" > /dev/null
-	mkdir -p distr
-	pushd distr > /dev/null
-		put_wget_creds "$releases_login" "$releases_password"
-		load_core "${gh_login}" "${gh_password}" "${flavour}"
-		load_gc
-		load_ui "${flavour}"
-		load_plugins "${flavour}"
-		release_wget_creds
-	popd > /dev/null
+    mkdir -p distr
+    pushd distr > /dev/null
+        load_core "${gh_login}" "${gh_password}" "${flavour}"
+        load_gc
+        load_ui "${flavour}"
+        load_plugins "${flavour}"
+    popd > /dev/null
 
-	create_data
-	generate_default "${flavour}"
-	generate_raw
+    create_data
+    generate_default "${flavour}"
+    generate_raw
 
-	create_scripts
+    create_scripts
 
-	write_flavour "${flavour}"
-	write_release
+    write_flavour "${flavour}"
 popd > /dev/null
+
+load_extras $args
+install_extras
+release_wget_creds
+
+pushd "${out_dir}"
+write_release
+popd
