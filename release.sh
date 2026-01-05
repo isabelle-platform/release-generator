@@ -57,6 +57,9 @@ url_extras_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/clou
 url_datagen_didactist="https://${gh_login}:${gh_password}@github.com/isabelle-platform/didactist-data-gen.git"
 url_ui_didactist=""
 
+url_datagen_evolucao="https://${gh_login}:${gh_password}@github.com/interpretica-io/evolucao-data-gen.git"
+url_ui_evolucao="https://releases.interpretica.io/evolucao/branches/main/evolucao-main-latest-wasm.tar.xz"
+
 url_scripts="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-scripts.git"
 
 function test_empty_fail() {
@@ -76,7 +79,7 @@ function fail() {
 
 function test_flavour() {
     case "$1" in
-        equestrian|intranet|sample|cloudcpe|didactist)
+        equestrian|intranet|sample|cloudcpe|didactist|evolucao)
             ;;
         *)
             echo "Unknown flavour: $1" >&2
@@ -120,6 +123,9 @@ function download_datagen() {
             ;;
         didactist)
             target_data_gen="$url_datagen_didactist"
+            ;;
+        evolucao)
+            target_data_gen="$url_datagen_evolucao"
             ;;
         *)
             echo "Unknown flavour: $flavour" >&2
@@ -185,6 +191,9 @@ function load_ui() {
         didactist)
             target_ui="$url_ui_didactist"
             ;;
+        evolucao)
+            target_ui="$url_ui_evolucao"
+            ;;
         *)
             echo "Unknown flavour: $flavour" >&2
             exit 1
@@ -219,6 +228,9 @@ function load_extras() {
             target_extras="$url_extras_cloudcpe"
             ;;
         didactist)
+            target_extras=""
+            ;;
+        evolucao)
             target_extras=""
             ;;
         *)
@@ -288,6 +300,9 @@ function load_plugins() {
             ;;
         didactist)
             load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-didactist/branches/main/isabelle-plugin-didactist-main-latest-linux-x86_64.tar.xz"
+            ;;
+        evolucao)
+            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-evolucao/branches/main/isabelle-plugin-evolucao-main-latest-linux-x86_64.tar.xz"
             ;;
         *)
             echo "Unknown flavour: $flavour" >&2
