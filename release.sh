@@ -54,6 +54,7 @@ url_ui_intranet="https://releases.interpretica.io/intranet/branches/main/intrane
 url_datagen_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-data-gen.git"
 url_ui_cloudcpe=""
 url_extras_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-extras.git"
+url_extras_midair="https://${gh_login}:${gh_password}@github.com/interpretica-io/midair-extras.git"
 url_datagen_didactist="https://${gh_login}:${gh_password}@github.com/isabelle-platform/didactist-data-gen.git"
 url_ui_didactist=""
 
@@ -231,7 +232,7 @@ function load_extras() {
             target_extras=""
             ;;
         midair)
-            target_extras=""
+            target_extras="$url_extras_midair"
             ;;
         *)
             echo "Unknown flavour: $flavour" >&2
@@ -263,6 +264,16 @@ function install_extras() {
     if [ -d extras/nginx ] ; then
         cp -R extras/nginx ${out_dir}/scripts/extras/
     fi
+    if [ -d extras/systemd ] ; then
+        cp -R extras/systemd ${out_dir}/scripts/extras/
+    fi
+    for helper in extras/*.sh ; do
+        [ -f "${helper}" ] || continue
+        case "$(basename "${helper}")" in
+            extras.sh) ;;
+            *) cp "${helper}" "${out_dir}/scripts/extras/" ;;
+        esac
+    done
 }
 
 function load_plugin() {
