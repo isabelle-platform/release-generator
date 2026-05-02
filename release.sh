@@ -134,7 +134,7 @@ function download_datagen() {
     esac
 
     rm -rf datagen
-    git clone "${target_data_gen}" datagen || fail "Failed to clone Data Generator"
+    git clone --depth 1 --recurse-submodules --shallow-submodules "${target_data_gen}" datagen || fail "Failed to clone Data Generator"
     return 0
 }
 
@@ -163,7 +163,7 @@ function load_gc() {
     mkdir -p core
     pushd core > /dev/null
         if [ ! -d isabelle-gc ] ; then
-            git clone ${url_gc} isabelle-gc || fail "Failed to get isabelle-gc"
+            git clone --depth 1 --recurse-submodules --shallow-submodules ${url_gc} isabelle-gc || fail "Failed to get isabelle-gc"
             rm -rf isabelle-gc/.git
         fi
     popd > /dev/null
@@ -244,7 +244,7 @@ function load_extras() {
     fi
 
     if [ ! -d extras ] ; then
-        git clone ${target_extras} extras || fail "Failed to get extras"
+        git clone --depth 1 --recurse-submodules --shallow-submodules ${target_extras} extras || fail "Failed to get extras"
         rm -rf extras/.git
     fi
 
@@ -332,7 +332,7 @@ function create_data() {
 
 function create_scripts() {
     if [ ! -d scripts ] ; then
-        git clone "${url_scripts}" scripts || fail "Failed to get scripts"
+        git clone --depth 1 --recurse-submodules --shallow-submodules "${url_scripts}" scripts || fail "Failed to get scripts"
         rm -rf scripts/.git
     fi
     echo > scripts/.in_release
