@@ -95,6 +95,39 @@ function fail() {
     exit 1
 }
 
+# Record the git commit (or other identifying string) of a release
+# component into distr/hashes/<name>. One file per component — mirrors
+# the legacy `core/hash` file but covers every source project.
+# Relies on the global ${out_dir} being an absolute path.
+function write_hash() {
+    local name="$1"
+    local value="$2"
+
+    [ -n "${value}" ] || value="unknown"
+    mkdir -p "${out_dir}/distr/hashes"
+    echo "${value}" > "${out_dir}/distr/hashes/${name}"
+    echo "Recorded hash for ${name}: ${value}"
+}
+
+# Extract git-sourced crates from a Cargo.lock and record each one's
+# pinned commit. crates.io deps carry `registry+...` sources and are
+# skipped, so this captures exactly the platform's own plugin projects.
+function write_cargo_lock_hashes() {
+    local lock="$1"
+
+    [ -f "${lock}" ] || return 0
+    awk '
+        /^name = "/ { n=$0; sub(/^name = "/,"",n); sub(/".*/,"",n); name=n }
+        /^source = "git\+/ {
+            s=$0; sub(/^source = "git\+/,"",s); sub(/".*/,"",s)
+            h=index(s,"#"); commit=(h>0)?substr(s,h+1):""
+            if (name!="" && commit!="") print name" "commit
+        }
+    ' "${lock}" | while read -r pkg commit ; do
+        write_hash "${pkg}" "${commit}"
+    done
+}
+
 function test_flavour() {
     case "$1" in
         equestrian|intranet|sample|cloudcpe|didactist|midair)
@@ -205,6 +238,7 @@ function download_datagen() {
 
     rm -rf datagen
     git clone --depth 1 --recurse-submodules --shallow-submodules "${target_data_gen}" datagen || fail "Failed to clone Data Generator"
+    write_hash "datagen" "$(git -C datagen rev-parse HEAD 2>/dev/null)"
     return 0
 }
 
@@ -235,7 +269,8 @@ function load_core() {
 # via git (resolved by cargo; private deps authenticate through the git
 # credential helper `put_git_creds` configured).
 #
-# Resulting binary lands at `core/<flavour>-core/isabelle-core`.
+# Resulting binary lands at `core/<flavour>-core` and the run.sh wrapper
+# at `core/run.sh` (flat layout, matching the legacy tarball structure).
 function build_core() {
     local flavour="$1"
 
@@ -265,16 +300,22 @@ function build_core() {
             || fail "Failed to build core shell for ${flavour}"
     popd > /dev/null
 
-    mkdir -p "core/${flavour}-core"
+    mkdir -p core
     cp "${build_root}/shell/target/release/isabelle-core-${flavour}" \
-        "core/${flavour}-core/isabelle-core" \
+        "core/${flavour}-core" \
         || fail "Built binary missing"
+    chmod +x "core/${flavour}-core"
 
     # run.sh wrapper lives in the core repo we just cloned.
     if [ -f "${build_root}/isabelle-core/run.sh" ] ; then
-        cp "${build_root}/isabelle-core/run.sh" "core/${flavour}-core/"
-        chmod +x "core/${flavour}-core/run.sh"
+        cp "${build_root}/isabelle-core/run.sh" "core/run.sh"
+        chmod +x "core/run.sh"
     fi
+
+    # Record source hashes: core itself plus every git-pinned plugin
+    # crate resolved into the shell crate's Cargo.lock.
+    write_hash "core" "$(git -C "${build_root}/isabelle-core" rev-parse HEAD 2>/dev/null)"
+    write_cargo_lock_hashes "${build_root}/shell/Cargo.lock"
 
     rm -rf "${build_root}"
     return 0
@@ -289,6 +330,7 @@ function load_gc() {
     pushd core > /dev/null
         if [ ! -d isabelle-gc ] ; then
             git clone --depth 1 --recurse-submodules --shallow-submodules ${url_gc} isabelle-gc || fail "Failed to get isabelle-gc"
+            write_hash "isabelle-gc" "$(git -C isabelle-gc rev-parse HEAD 2>/dev/null)"
             rm -rf isabelle-gc/.git
         fi
     popd > /dev/null
@@ -300,6 +342,7 @@ function load_ui() {
     local flavour="$1"
     local wgetrc="${WGETRC_PATH}"
     local target_ui
+    local ui_hash=""
 
     case "$flavour" in
         equestrian)
@@ -329,9 +372,13 @@ function load_ui() {
     if [ "${target_ui}" != "" ] ; then
         pushd ui > /dev/null
             WGETRC="${wgetrc}" wget -O ui.tar.xz "${target_ui}" || fail "Failed to get UI"
+            # UI ships as a prebuilt wasm tarball — there is no git
+            # checkout to hash, so record the artifact's sha256 instead.
+            ui_hash="$(sha256sum ui.tar.xz 2>/dev/null | awk '{print $1}')"
             tar xvf ui.tar.xz
             rm ui.tar.xz
         popd > /dev/null
+        write_hash "ui" "${ui_hash}"
     fi
 
     return 0
@@ -370,6 +417,7 @@ function load_extras() {
 
     if [ ! -d extras ] ; then
         git clone --depth 1 --recurse-submodules --shallow-submodules ${target_extras} extras || fail "Failed to get extras"
+        write_hash "extras" "$(git -C extras rev-parse HEAD 2>/dev/null)"
         rm -rf extras/.git
     fi
 
@@ -443,6 +491,7 @@ function create_data() {
 function create_scripts() {
     if [ ! -d scripts ] ; then
         git clone --depth 1 --recurse-submodules --shallow-submodules "${url_scripts}" scripts || fail "Failed to get scripts"
+        write_hash "scripts" "$(git -C scripts rev-parse HEAD 2>/dev/null)"
         rm -rf scripts/.git
     fi
     echo > scripts/.in_release
@@ -484,10 +533,15 @@ test_flavour "$flavour"
 # private GitHub orgs and the URLs no longer carry inline creds.
 put_git_creds "$gh_login" "$gh_password"
 
+# Create the output dir up front and make its path absolute, so helpers
+# that run from varying working directories (write_hash) can reliably
+# write into ${out_dir}/distr/hashes regardless of the current cwd.
+mkdir -p "${out_dir}"
+out_dir="$(cd "${out_dir}" && pwd)"
+
 download_datagen "$flavour"
 
 put_wget_creds "$releases_login" "$releases_password"
-mkdir -p "${out_dir}"
 pushd "${out_dir}" > /dev/null
     mkdir -p distr
     pushd distr > /dev/null
