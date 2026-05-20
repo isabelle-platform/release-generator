@@ -3,7 +3,7 @@ pipeline {
     copyArtifactPermission("*");
   }
   parameters {
-    string(name: "FLAVOUR", defaultValue: "intranet", description: "Isabelle flavour")
+    choice(name: "FLAVOUR", choices: ["intranet", "cloudcpe", "midair", "proteos"], description: "Isabelle flavour")
     string(name: "FTP_CONFIG", defaultValue: "isabelle-intranet-release", description: "Artifact location")
   }
   agent {

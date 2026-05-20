@@ -66,11 +66,15 @@ url_datagen_cloudcpe="https://github.com/cloudcpe/cloudcpe-data-gen.git"
 url_ui_cloudcpe=""
 url_extras_cloudcpe="https://github.com/cloudcpe/cloudcpe-extras.git"
 url_extras_midair="https://github.com/interpretica-io/midair-extras.git"
+url_extras_proteos="https://github.com/interpretica-io/proteos-extras.git"
 url_datagen_didactist="https://github.com/isabelle-platform/didactist-data-gen.git"
 url_ui_didactist=""
 
 url_datagen_midair="https://github.com/interpretica-io/midair-data-gen.git"
 url_ui_midair="https://releases.interpretica.io/midair/branches/main/midair-main-latest-wasm.tar.xz"
+
+url_datagen_proteos="https://github.com/interpretica-io/proteos-data-gen.git"
+url_ui_proteos="https://releases.interpretica.io/proteos/branches/main/proteos-main-latest-wasm.tar.xz"
 
 url_scripts="https://github.com/isabelle-platform/isabelle-scripts.git"
 
@@ -130,7 +134,7 @@ function write_cargo_lock_hashes() {
 
 function test_flavour() {
     case "$1" in
-        equestrian|intranet|sample|cloudcpe|didactist|midair)
+        intranet|cloudcpe|midair|proteos)
             ;;
         *)
             echo "Unknown flavour: $1" >&2
@@ -230,6 +234,9 @@ function download_datagen() {
             ;;
         midair)
             target_data_gen="$url_datagen_midair"
+            ;;
+        proteos)
+            target_data_gen="$url_datagen_proteos"
             ;;
         *)
             echo "Unknown flavour: $flavour" >&2
@@ -363,6 +370,9 @@ function load_ui() {
         midair)
             target_ui="$url_ui_midair"
             ;;
+        proteos)
+            target_ui="$url_ui_proteos"
+            ;;
         *)
             echo "Unknown flavour: $flavour" >&2
             exit 1
@@ -405,6 +415,9 @@ function load_extras() {
             ;;
         midair)
             target_extras="$url_extras_midair"
+            ;;
+        proteos)
+            target_extras="$url_extras_proteos"
             ;;
         *)
             echo "Unknown flavour: $flavour" >&2
@@ -471,7 +484,7 @@ function load_plugins() {
     # separate plugin tarballs anymore. Kept as a no-op so the rest of the
     # pipeline doesn't need a conditional.
     case "$flavour" in
-        equestrian|sample|intranet|cloudcpe|didactist|midair)
+        intranet|cloudcpe|midair|proteos)
             return 0
             ;;
         *)
