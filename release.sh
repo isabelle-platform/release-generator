@@ -7,6 +7,9 @@ gh_login=""
 gh_password=""
 out_dir=""
 flavour=""
+# Branch of isabelle-core to build from. Defaults to main; override with
+# --core-branch to release-test a feature branch.
+core_branch="main"
 args="$@"
 
 while test -n "$1" ; do
@@ -35,6 +38,10 @@ while test -n "$1" ; do
             flavour="$2"
             shift 1
             ;;
+        --core-branch)
+            core_branch="$2"
+            shift 1
+            ;;
         *)
             echo "Unknown argument: $1" >&2
             exit 1
@@ -45,23 +52,33 @@ done
 
 url_core="https://releases.interpretica.io/isabelle-core/branches/main/isabelle-core-main-latest-linux-x86_64.tar.xz"
 url_gc="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-gc.git"
-url_datagen_equestrian="https://${gh_login}:${gh_password}@github.com/isabelle-platform/equestrian-data-gen.git"
+# GitHub URLs are kept "clean" (no embedded creds) — auth is handled by
+# git's credential helper that `put_git_creds` configures at runtime. This
+# avoids leaking the PAT into local `.git/config` of each clone, build logs,
+# and `git ls-remote` output.
+url_datagen_equestrian="https://github.com/isabelle-platform/equestrian-data-gen.git"
 url_ui_equestrian="https://releases.interpretica.io/isabelle-ui/branches/main/isabelle-ui-main-latest-wasm.tar.xz"
-url_datagen_sample="https://${gh_login}:${gh_password}@github.com/isabelle-platform/sample-data-gen.git"
+url_datagen_sample="https://github.com/isabelle-platform/sample-data-gen.git"
 url_ui_sample="https://releases.interpretica.io/sample-ui/branches/main/sample-ui-main-latest-wasm.tar.xz"
-url_datagen_intranet="https://${gh_login}:${gh_password}@github.com/intranet-platform/intranet-data-gen.git"
+url_datagen_intranet="https://github.com/intranet-platform/intranet-data-gen.git"
 url_ui_intranet="https://releases.interpretica.io/intranet/branches/main/intranet-main-latest-wasm.tar.xz"
-url_datagen_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-data-gen.git"
+url_datagen_cloudcpe="https://github.com/cloudcpe/cloudcpe-data-gen.git"
 url_ui_cloudcpe=""
-url_extras_cloudcpe="https://${gh_login}:${gh_password}@github.com/cloudcpe/cloudcpe-extras.git"
-url_extras_midair="https://${gh_login}:${gh_password}@github.com/interpretica-io/midair-extras.git"
-url_datagen_didactist="https://${gh_login}:${gh_password}@github.com/isabelle-platform/didactist-data-gen.git"
+url_extras_cloudcpe="https://github.com/cloudcpe/cloudcpe-extras.git"
+url_extras_midair="https://github.com/interpretica-io/midair-extras.git"
+url_datagen_didactist="https://github.com/isabelle-platform/didactist-data-gen.git"
 url_ui_didactist=""
 
-url_datagen_midair="https://${gh_login}:${gh_password}@github.com/interpretica-io/midair-data-gen.git"
+url_datagen_midair="https://github.com/interpretica-io/midair-data-gen.git"
 url_ui_midair="https://releases.interpretica.io/midair/branches/main/midair-main-latest-wasm.tar.xz"
 
-url_scripts="https://${gh_login}:${gh_password}@github.com/isabelle-platform/isabelle-scripts.git"
+url_scripts="https://github.com/isabelle-platform/isabelle-scripts.git"
+
+# Source repo for the core crate. Plugin crates are no longer cloned here:
+# core's Cargo.toml lists them as `git = "..."` deps with pinned tags, so
+# `cargo build` fetches them automatically (using the git credential
+# helper set up by `put_git_creds` for the private ones).
+url_core_src="https://github.com/isabelle-platform/isabelle-core.git"
 
 function test_empty_fail() {
     local var="$1"
@@ -103,6 +120,48 @@ function put_wget_creds() {
 
 function release_wget_creds() {
     rm $(pwd)/.wgetrc
+}
+
+# Configure git's `store` credential helper backed by a per-run file. Once
+# this is set up, plain `https://github.com/...` URLs work for both git
+# clone and Cargo (via CARGO_NET_GIT_FETCH_WITH_CLI=true) — no need to bake
+# the PAT into URLs. The helper is scoped to this run via --file=<path>;
+# we tear it down at the end via `release_git_creds`.
+function put_git_creds() {
+    local login="$1"
+    local password="$2"
+
+    local cred_file
+    cred_file="$(pwd)/.git-credentials"
+    : > "$cred_file"
+    chmod 600 "$cred_file"
+
+    # Encode user/pw per RFC 3986 in case they contain `@`, `:`, `/` etc.
+    local enc_login enc_password
+    enc_login=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$login")
+    enc_password=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$password")
+    echo "https://${enc_login}:${enc_password}@github.com" >> "$cred_file"
+
+    # Older `git config --global` writes go to ~/.gitconfig — but in CI we
+    # want this isolated to the run. Use GIT_CONFIG_GLOBAL to point at a
+    # per-run file. (git >= 2.32.) For tighter compat, also set it via
+    # repo-local config when present.
+    export GIT_CONFIG_GLOBAL="$(pwd)/.gitconfig-run"
+    : > "$GIT_CONFIG_GLOBAL"
+    git config --file "$GIT_CONFIG_GLOBAL" credential.helper "store --file=$cred_file"
+
+    # Cargo uses libgit2 by default, which does NOT honour credential
+    # helpers. Switch it to system git so private deps resolve via the
+    # same .git-credentials we just wrote.
+    export CARGO_NET_GIT_FETCH_WITH_CLI=true
+
+    echo "Put git credentials to ${cred_file} (global config: ${GIT_CONFIG_GLOBAL})"
+}
+
+function release_git_creds() {
+    rm -f "$(pwd)/.git-credentials" "$(pwd)/.gitconfig-run"
+    unset GIT_CONFIG_GLOBAL
+    unset CARGO_NET_GIT_FETCH_WITH_CLI
 }
 
 function download_datagen() {
@@ -152,6 +211,61 @@ function load_core() {
         mv isabelle-core ${flavour}-core
     popd > /dev/null
 
+    return 0
+}
+
+# Build the core binary from source for the given flavour.
+#
+# The plugin set for each flavour is defined by `flavours/<flavour>.json`
+# in THIS repo. We clone isabelle-core (which carries the shell templates
+# + generator under tools/gen_shell.py), generate a shell crate from the
+# templates + our flavour json, and cargo-build it. The shell crate
+# depends on the cloned core via a relative path and on the plugin crates
+# via git (resolved by cargo; private deps authenticate through the git
+# credential helper `put_git_creds` configured).
+#
+# Resulting binary lands at `core/<flavour>-core/isabelle-core`.
+function build_core() {
+    local flavour="$1"
+
+    local flavour_json="${TOP_DIR}/flavours/${flavour}.json"
+    [ -f "${flavour_json}" ] || fail "No flavour definition: ${flavour_json}"
+
+    local build_root
+    build_root="$(pwd)/build-shell"
+    rm -rf "${build_root}"
+    mkdir -p "${build_root}"
+
+    git clone --depth 1 --branch "${core_branch}" "${url_core_src}" \
+        "${build_root}/isabelle-core" \
+        || fail "Failed to clone isabelle-core (branch ${core_branch})"
+
+    # Generate the shell crate (Cargo.toml + src/main.rs) next to the core
+    # clone. `../isabelle-core` is the path from the shell dir back to core.
+    python3 "${build_root}/isabelle-core/tools/gen_shell.py" \
+        "${flavour}" \
+        "../isabelle-core" \
+        "${build_root}/shell" \
+        "${flavour_json}" \
+        || fail "Failed to generate shell crate for ${flavour}"
+
+    pushd "${build_root}/shell" > /dev/null
+        cargo build --release \
+            || fail "Failed to build core shell for ${flavour}"
+    popd > /dev/null
+
+    mkdir -p "core/${flavour}-core"
+    cp "${build_root}/shell/target/release/isabelle-core-${flavour}" \
+        "core/${flavour}-core/isabelle-core" \
+        || fail "Built binary missing"
+
+    # run.sh wrapper lives in the core repo we just cloned.
+    if [ -f "${build_root}/isabelle-core/run.sh" ] ; then
+        cp "${build_root}/isabelle-core/run.sh" "core/${flavour}-core/"
+        chmod +x "core/${flavour}-core/run.sh"
+    fi
+
+    rm -rf "${build_root}"
     return 0
 }
 
@@ -292,35 +406,20 @@ function load_plugin() {
 
 function load_plugins() {
     local flavour="$1"
-    local wgetrc="${WGETRC_PATH}"
 
-    load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-security/branches/main/isabelle-plugin-security-main-latest-linux-x86_64.tar.xz"
-
+    # All actor-mode flavours: plugins are statically linked into the core
+    # binary via `cargo build --features <flavour>` (see `build_core`). No
+    # separate plugin tarballs anymore. Kept as a no-op so the rest of the
+    # pipeline doesn't need a conditional.
     case "$flavour" in
-        equestrian)
-            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-equestrian/branches/main/isabelle-plugin-equestrian-main-latest-linux-x86_64.tar.xz"
-            ;;
-        sample)
-            ;;
-        intranet)
-            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-intranet/branches/main/isabelle-plugin-intranet-main-latest-linux-x86_64.tar.xz"
-            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-web/branches/main/isabelle-plugin-web-main-latest-linux-x86_64.tar.xz"
-            ;;
-        cloudcpe)
-            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-cloudcpe/branches/main/isabelle-plugin-cloudcpe-main-latest-linux-x86_64.tar.xz"
-            ;;
-        didactist)
-            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-didactist/branches/main/isabelle-plugin-didactist-main-latest-linux-x86_64.tar.xz"
-            ;;
-        midair)
-            load_plugin "$wgetrc" "https://releases.interpretica.io/isabelle-plugins/isabelle-plugin-midair/branches/main/isabelle-plugin-midair-main-latest-linux-x86_64.tar.xz"
+        equestrian|sample|intranet|cloudcpe|didactist|midair)
+            return 0
             ;;
         *)
             echo "Unknown flavour: $flavour" >&2
             exit 1
+            ;;
     esac
-
-    return 0
 }
 
 function create_data() {
@@ -370,6 +469,10 @@ test_empty_fail "$out_dir"
 test_empty_fail "$flavour"
 test_flavour "$flavour"
 
+# Set git credentials BEFORE the first clone — datagen/extras live in
+# private GitHub orgs and the URLs no longer carry inline creds.
+put_git_creds "$gh_login" "$gh_password"
+
 download_datagen "$flavour"
 
 put_wget_creds "$releases_login" "$releases_password"
@@ -377,7 +480,10 @@ mkdir -p "${out_dir}"
 pushd "${out_dir}" > /dev/null
     mkdir -p distr
     pushd distr > /dev/null
-        load_core "${gh_login}" "${gh_password}" "${flavour}"
+        # Every flavour now builds core from source — plugins are
+        # statically linked via `--features <flavour>`. No more separate
+        # plugin tarballs; `load_plugins` is a no-op for everyone.
+        build_core "${flavour}"
         load_gc
         load_ui "${flavour}"
         load_plugins "${flavour}"
@@ -395,6 +501,7 @@ popd > /dev/null
 load_extras $args
 install_extras
 release_wget_creds
+release_git_creds
 
 pushd "${out_dir}"
 write_release
