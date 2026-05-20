@@ -155,6 +155,14 @@ function put_git_creds() {
     # same .git-credentials we just wrote.
     export CARGO_NET_GIT_FETCH_WITH_CLI=true
 
+    # Keep Cargo's git/registry cache inside the (writable) workspace.
+    # The CI Docker image bakes `HOME=/home/root` owned by root, but the
+    # Jenkins agent runs under a different uid, so the default
+    # `$HOME/.cargo` is not writable. A workspace-local CARGO_HOME avoids
+    # the `Permission denied` failure.
+    export CARGO_HOME="$(pwd)/.cargo-home"
+    mkdir -p "$CARGO_HOME"
+
     echo "Put git credentials to ${cred_file} (global config: ${GIT_CONFIG_GLOBAL})"
 }
 
@@ -162,6 +170,9 @@ function release_git_creds() {
     rm -f "$(pwd)/.git-credentials" "$(pwd)/.gitconfig-run"
     unset GIT_CONFIG_GLOBAL
     unset CARGO_NET_GIT_FETCH_WITH_CLI
+    # CARGO_HOME (.cargo-home) is intentionally left in place — it's just a
+    # cache and speeds up subsequent runs in a reused workspace.
+    unset CARGO_HOME
 }
 
 function download_datagen() {
