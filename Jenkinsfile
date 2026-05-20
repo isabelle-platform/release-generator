@@ -4,13 +4,16 @@ pipeline {
   }
   parameters {
     choice(name: "FLAVOUR", choices: ["intranet", "cloudcpe", "midair", "proteos"], description: "Isabelle flavour")
-    string(name: "FTP_CONFIG", defaultValue: "isabelle-intranet-release", description: "Artifact location")
   }
   agent {
     dockerfile {
       filename 'Dockerfile'
       dir '.'
     }
+  }
+  environment {
+    // Artifact location is derived from the selected flavour.
+    FTP_CONFIG = "isabelle-${params.FLAVOUR}-release"
   }
 
   stages {
@@ -54,7 +57,7 @@ pipeline {
                          paramPublish: null,
                          publishers: [
                           [
-                            configName: "${params.FTP_CONFIG}",
+                            configName: "${env.FTP_CONFIG}",
                             transfers:
                               [[
                                 asciiMode: false,
@@ -85,7 +88,7 @@ pipeline {
                          paramPublish: null,
                          publishers: [
                           [
-                            configName: "${params.FTP_CONFIG}",
+                            configName: "${env.FTP_CONFIG}",
                             transfers:
                               [[
                                 asciiMode: false,
