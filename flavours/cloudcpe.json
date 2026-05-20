@@ -1,0 +1,12 @@
+[
+  {
+    "name": "isabelle-plugin-security",
+    "url": "https://github.com/isabelle-platform/isabelle-plugin-security",
+    "tag": "1.20.0"
+  },
+  {
+    "name": "isabelle-plugin-cloudcpe",
+    "url": "https://github.com/cloudcpe/isabelle-plugin-cloudcpe",
+    "tag": "0.50.0"
+  }
+]
