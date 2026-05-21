@@ -1,3 +1,7 @@
 /out
 /datagen
 /extras
+
+# Local-dev plugin path overrides consumed by isabelle-core gen_shell.py.
+# Never committed — they point at developer-local checkouts.
+flavours/*.dbg
