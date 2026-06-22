@@ -76,6 +76,11 @@ url_ui_midair="https://releases.interpretica.io/midair/branches/main/midair-main
 url_datagen_proteos="https://github.com/interpretica-io/proteos-data-gen.git"
 url_ui_proteos="https://releases.interpretica.io/proteos/branches/main/proteos-main-latest-wasm.tar.xz"
 
+# Droplet-provisioning CLI the proteos plugin shells out to (PROTOSTAR_BIN).
+# Shipped only for the proteos flavour; extracted next to the core binary so
+# run.sh can point PROTOSTAR_BIN at it (see load_protostar).
+url_protostar="https://releases.interpretica.io/protostar/branches/main/protostar-main-latest-linux-x86_64.tar.xz"
+
 url_scripts="https://github.com/isabelle-platform/isabelle-scripts.git"
 
 # Source repo for the core crate. Plugin crates are no longer cloned here:
@@ -366,6 +371,48 @@ function load_gc() {
     return 0
 }
 
+# Ship the protostar CLI next to the core binary so the proteos plugin can
+# spawn it (PROTOSTAR_BIN). Only the proteos flavour needs it; every other
+# flavour gets an empty target and this is a no-op. The binary lands at
+# core/protostar — the same dir as core/run.sh — so run.sh resolves it via
+# $TOP_DIR/protostar.
+function load_protostar() {
+    local flavour="$1"
+    local wgetrc="${WGETRC_PATH}"
+    local target_protostar
+    local protostar_hash=""
+
+    case "$flavour" in
+        proteos)
+            target_protostar="$url_protostar"
+            ;;
+        *)
+            target_protostar=""
+            ;;
+    esac
+
+    [ -n "${target_protostar}" ] || return 0
+
+    mkdir -p core
+    pushd core > /dev/null
+        WGETRC="${wgetrc}" wget -O protostar.tar.xz "${target_protostar}" \
+            || fail "Failed to get protostar"
+        tar xvf protostar.tar.xz
+        rm protostar.tar.xz
+        # The protostar tarball ships its own short git hash in `hash`;
+        # record it under hashes/ then drop the stray file from the release
+        # root so it doesn't sit next to the binary.
+        if [ -f hash ] ; then
+            protostar_hash="$(cat hash 2>/dev/null)"
+            rm -f hash
+        fi
+        chmod +x protostar 2>/dev/null || true
+    popd > /dev/null
+    write_hash "protostar" "${protostar_hash}"
+
+    return 0
+}
+
 function load_ui() {
     local flavour="$1"
     local wgetrc="${WGETRC_PATH}"
@@ -585,6 +632,7 @@ pushd "${out_dir}" > /dev/null
         build_core "${flavour}"
         load_gc
         load_ui "${flavour}"
+        load_protostar "${flavour}"
         load_plugins "${flavour}"
     popd > /dev/null
 
