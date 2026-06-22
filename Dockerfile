@@ -1,12 +1,17 @@
-FROM ubuntu:25.04
+# Build on 22.04 (glibc 2.35) to match the deployment target. glibc is
+# backward- but not forward-compatible: a binary built on a newer glibc
+# (e.g. 25.04's 2.41) pulls in symbols like pidfd_spawnp@GLIBC_2.39 that
+# are absent on the prod hosts, and fails to start. Keep this <= the
+# oldest glibc we deploy to.
+FROM ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN mkdir -p /home/root
 ENV HOME="/home/root"
 
-# Note: no `cargo` from apt — Ubuntu 25.04 ships Rust 1.84, too old for
-# the `edition2024` crates in the dependency tree (need >= 1.85).
+# Rust comes from rustup below (not apt), so the base image's Rust age is
+# irrelevant — `stable` satisfies the edition2024 crates (need >= 1.85).
 RUN apt-get update && \
     apt-get install -y build-essential curl git libssl-dev pkg-config python3 wget
 
