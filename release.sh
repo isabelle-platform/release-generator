@@ -284,14 +284,34 @@ function build_core() {
     local flavour_json="${TOP_DIR}/flavours/${flavour}.json"
     [ -f "${flavour_json}" ] || fail "No flavour definition: ${flavour_json}"
 
-    local build_root
-    build_root="$(pwd)/build-shell"
-    rm -rf "${build_root}"
+    # Keep build-shell at the repo root (outside out/) so `rm -rf out` in the
+    # Jenkins clean-up stage doesn't wipe Cargo's incremental artifacts between
+    # builds. This makes subsequent builds significantly faster.
+    local build_root="${TOP_DIR}/build-shell"
     mkdir -p "${build_root}"
 
-    git clone --depth 1 --branch "${core_branch}" "${url_core_src}" \
-        "${build_root}/isabelle-core" \
-        || fail "Failed to clone isabelle-core (branch ${core_branch})"
+    # Reuse an existing isabelle-core clone if present so we avoid a full
+    # re-clone on every run. Falls back to a fresh clone on first run or if
+    # the clone is corrupt.
+    if [ -d "${build_root}/isabelle-core/.git" ]; then
+        git -C "${build_root}/isabelle-core" fetch --depth 1 origin "${core_branch}" \
+            || fail "Failed to fetch isabelle-core (branch ${core_branch})"
+        git -C "${build_root}/isabelle-core" reset --hard FETCH_HEAD \
+            || fail "Failed to reset isabelle-core to ${core_branch}"
+    else
+        git clone --depth 1 --branch "${core_branch}" "${url_core_src}" \
+            "${build_root}/isabelle-core" \
+            || fail "Failed to clone isabelle-core (branch ${core_branch})"
+    fi
+
+    # Enable sccache if it is available. SCCACHE_DIR lives in the workspace
+    # next to build-shell so it persists across builds without a Docker volume
+    # mount. sccache caches at the rustc level, so even a forced full rebuild
+    # (e.g. after gen_shell regenerates src/main.rs) is fast on cache hit.
+    if command -v sccache > /dev/null 2>&1; then
+        export RUSTC_WRAPPER=sccache
+        export SCCACHE_DIR="${TOP_DIR}/.sccache"
+    fi
 
     # Generate the shell crate (Cargo.toml + src/main.rs) next to the core
     # clone. `../isabelle-core` is the path from the shell dir back to core.
@@ -324,7 +344,8 @@ function build_core() {
     write_hash "core" "$(git -C "${build_root}/isabelle-core" rev-parse HEAD 2>/dev/null)"
     write_cargo_lock_hashes "${build_root}/shell/Cargo.lock"
 
-    rm -rf "${build_root}"
+    # build-shell is intentionally kept for incremental Cargo recompilation
+    # on the next run. .sccache is similarly kept as the compiler cache.
     return 0
 }
 

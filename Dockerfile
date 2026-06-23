@@ -25,3 +25,12 @@ ENV PATH=/opt/rust/cargo/bin:$PATH
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
       | sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable && \
     chmod -R a+rX /opt/rust
+
+# sccache: prebuilt musl binary — no compilation needed, works under any uid.
+# The cache directory is set at runtime (SCCACHE_DIR in release.sh) to a
+# workspace-local path that survives between builds on the same Jenkins node.
+RUN SCCACHE_VER=0.8.2 && \
+    curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VER}/sccache-v${SCCACHE_VER}-x86_64-unknown-linux-musl.tar.gz" \
+      | tar xz -C /tmp && \
+    mv "/tmp/sccache-v${SCCACHE_VER}-x86_64-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
+    chmod +x /usr/local/bin/sccache
