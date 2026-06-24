@@ -3,7 +3,7 @@ pipeline {
     copyArtifactPermission("*");
   }
   parameters {
-    choice(name: "FLAVOUR", choices: ["intranet", "cloudcpe", "midair", "proteos"], description: "Isabelle flavour")
+    choice(name: "FLAVOUR", choices: ["none", "intranet", "cloudcpe", "midair", "proteos"], description: "Isabelle flavour (default 'none' builds nothing)")
   }
   agent {
     dockerfile {
@@ -18,11 +18,13 @@ pipeline {
 
   stages {
     stage('Clean up build folders') {
+      when { expression { params.FLAVOUR != "none" } }
       steps {
         sh 'rm -rf out || true'
       }
     }
     stage('Download prerequisites') {
+      when { expression { params.FLAVOUR != "none" } }
       steps {
         dir('ttg') {
           git url: 'https://github.com/maximmenshikov/ttg.git',
@@ -31,6 +33,7 @@ pipeline {
       }
     }
     stage('Download for all platforms') {
+      when { expression { params.FLAVOUR != "none" } }
       stages {
         stage('Download (Linux)') {
           steps {
@@ -47,6 +50,7 @@ pipeline {
       }
     }
     stage('Publish artifacts') {
+      when { expression { params.FLAVOUR != "none" } }
       parallel {
         stage('Publish branch artifacts') {
           steps {
