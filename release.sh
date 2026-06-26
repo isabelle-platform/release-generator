@@ -66,7 +66,7 @@ url_datagen_cloudcpe="https://github.com/cloudcpe/cloudcpe-data-gen.git"
 url_ui_cloudcpe=""
 url_extras_cloudcpe="https://github.com/cloudcpe/cloudcpe-extras.git"
 url_extras_midair="https://github.com/interpretica-io/midair-extras.git"
-url_extras_proteos="https://github.com/interpretica-io/proteos-extras.git"
+url_extras_proteos=""
 url_datagen_didactist="https://github.com/isabelle-platform/didactist-data-gen.git"
 url_ui_didactist=""
 
