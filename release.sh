@@ -81,6 +81,12 @@ url_ui_proteos="https://releases.interpretica.io/proteos/branches/main/proteos-m
 # run.sh can point PROTOSTAR_BIN at it (see load_protostar).
 url_protostar="https://releases.interpretica.io/protostar/branches/main/protostar-main-latest-linux-x86_64.tar.xz"
 
+# protostar config (droplet templates + bootstrap script) for the proteos
+# flavour. Private repo — auth handled by put_git_creds. Only tracked files
+# are cloned; .env, SSH private keys and state.json are gitignored, so no
+# secrets land in the archive (see load_protostar_cfgs).
+url_protostar_cfgs="https://github.com/interpretica-io/protostar-cfgs.git"
+
 url_scripts="https://github.com/isabelle-platform/isabelle-scripts.git"
 
 # Source repo for the core crate. Plugin crates are no longer cloned here:
@@ -413,6 +419,41 @@ function load_protostar() {
     return 0
 }
 
+# Ship the protostar config for the proteos flavour, next to the binary at
+# core/protostar-cfgs. The git clone carries only tracked files — .env, the
+# SSH private keys under keys/ and the live state.json are all gitignored,
+# so the archive stays secret-free. protostar.yaml is refreshed on every
+# update; state.json is created at runtime in this same dir and, being absent
+# from the tarball, survives in-place updates (tar never overwrites it).
+function load_protostar_cfgs() {
+    local flavour="$1"
+    local target_cfgs
+
+    case "$flavour" in
+        proteos)
+            target_cfgs="$url_protostar_cfgs"
+            ;;
+        *)
+            target_cfgs=""
+            ;;
+    esac
+
+    [ -n "${target_cfgs}" ] || return 0
+
+    mkdir -p core
+    pushd core > /dev/null
+        if [ ! -d protostar-cfgs ] ; then
+            git clone --depth 1 --recurse-submodules --shallow-submodules \
+                "${target_cfgs}" protostar-cfgs \
+                || fail "Failed to get protostar-cfgs"
+            write_hash "protostar-cfgs" "$(git -C protostar-cfgs rev-parse HEAD 2>/dev/null)"
+            rm -rf protostar-cfgs/.git
+        fi
+    popd > /dev/null
+
+    return 0
+}
+
 function load_ui() {
     local flavour="$1"
     local wgetrc="${WGETRC_PATH}"
@@ -633,6 +674,7 @@ pushd "${out_dir}" > /dev/null
         load_gc
         load_ui "${flavour}"
         load_protostar "${flavour}"
+        load_protostar_cfgs "${flavour}"
         load_plugins "${flavour}"
     popd > /dev/null
 
