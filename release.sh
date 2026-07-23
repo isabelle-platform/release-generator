@@ -87,6 +87,9 @@ url_protostar="https://releases.interpretica.io/protostar/branches/main/protosta
 # secrets land in the archive (see load_protostar_cfgs).
 url_protostar_cfgs="https://github.com/interpretica-io/protostar-cfgs.git"
 
+url_datagen_zine="https://github.com/interpretica-io/zine-data-gen.git"
+url_ui_zine="https://releases.interpretica.io/zine/branches/main/zine-main-latest-wasm.tar.xz"
+
 url_scripts="https://github.com/isabelle-platform/isabelle-scripts.git"
 
 # Source repo for the core crate. Plugin crates are no longer cloned here:
@@ -145,7 +148,7 @@ function write_cargo_lock_hashes() {
 
 function test_flavour() {
     case "$1" in
-        intranet|cloudcpe|midair|proteos)
+        intranet|cloudcpe|midair|proteos|zine)
             ;;
         *)
             echo "Unknown flavour: $1" >&2
@@ -248,6 +251,9 @@ function download_datagen() {
             ;;
         proteos)
             target_data_gen="$url_datagen_proteos"
+            ;;
+        zine)
+            target_data_gen="$url_datagen_zine"
             ;;
         *)
             echo "Unknown flavour: $flavour" >&2
@@ -482,6 +488,9 @@ function load_ui() {
         proteos)
             target_ui="$url_ui_proteos"
             ;;
+        zine)
+            target_ui="$url_ui_zine"
+            ;;
         *)
             echo "Unknown flavour: $flavour" >&2
             exit 1
@@ -527,6 +536,9 @@ function load_extras() {
             ;;
         proteos)
             target_extras="$url_extras_proteos"
+            ;;
+        zine)
+            target_extras=""
             ;;
         *)
             echo "Unknown flavour: $flavour" >&2
@@ -593,7 +605,7 @@ function load_plugins() {
     # separate plugin tarballs anymore. Kept as a no-op so the rest of the
     # pipeline doesn't need a conditional.
     case "$flavour" in
-        intranet|cloudcpe|midair|proteos)
+        intranet|cloudcpe|midair|proteos|zine)
             return 0
             ;;
         *)
