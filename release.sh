@@ -87,6 +87,12 @@ url_protostar="https://releases.interpretica.io/protostar/branches/main/protosta
 # secrets land in the archive (see load_protostar_cfgs).
 url_protostar_cfgs="https://github.com/interpretica-io/protostar-cfgs.git"
 
+# Webhook runner shipped next to the core binary for the midair flavour.
+# Horizon lives in a private repo and publishes prebuilt static musl binaries
+# as GitHub release assets, so it is fetched via the GitHub API with the same
+# PAT the git credential helper uses (see load_horizon).
+url_horizon_release="https://api.github.com/repos/interpretica-io/horizon/releases/latest"
+
 url_datagen_zine="https://github.com/interpretica-io/zine-data-gen.git"
 url_ui_zine="https://releases.interpretica.io/zine/branches/main/zine-main-latest-wasm.tar.xz"
 
@@ -460,6 +466,49 @@ function load_protostar_cfgs() {
     return 0
 }
 
+# Ship the horizon webhook runner next to the core binary. Only the midair
+# flavour carries it; every other flavour gets an empty target and this is a
+# no-op. Release assets of a private repo can't be fetched by plain URL, so
+# we resolve the latest release through the GitHub API (Authorization: token)
+# and download the static x86_64 musl binary asset. The binary lands at
+# core/horizon — the same dir as core/run.sh.
+function load_horizon() {
+    local flavour="$1"
+
+    case "$flavour" in
+        midair)
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    local release_json tag asset_url
+    release_json="$(curl -sfL -H "Authorization: token ${gh_password}" \
+        "${url_horizon_release}")" \
+        || fail "Failed to query horizon latest release"
+    tag="$(echo "${release_json}" | python3 -c \
+        'import sys, json; print(json.load(sys.stdin)["tag_name"])')" \
+        || fail "Failed to parse horizon release tag"
+    asset_url="$(echo "${release_json}" | python3 -c 'import sys, json
+r = json.load(sys.stdin)
+print(next(a["url"] for a in r["assets"]
+           if a["name"] == "horizon-x86_64-unknown-linux-musl"))')" \
+        || fail "No horizon linux x86_64 binary in release ${tag}"
+
+    mkdir -p core
+    pushd core > /dev/null
+        curl -sfL -H "Authorization: token ${gh_password}" \
+            -H "Accept: application/octet-stream" \
+            -o horizon "${asset_url}" \
+            || fail "Failed to download horizon ${tag}"
+        chmod +x horizon
+    popd > /dev/null
+    write_hash "horizon" "${tag}"
+
+    return 0
+}
+
 function load_ui() {
     local flavour="$1"
     local wgetrc="${WGETRC_PATH}"
@@ -687,6 +736,7 @@ pushd "${out_dir}" > /dev/null
         load_ui "${flavour}"
         load_protostar "${flavour}"
         load_protostar_cfgs "${flavour}"
+        load_horizon "${flavour}"
         load_plugins "${flavour}"
     popd > /dev/null
 
