@@ -10,7 +10,12 @@ flavour=""
 # Branch of isabelle-core to build from. Defaults to main; override with
 # --core-branch to release-test a feature branch.
 core_branch="main"
-args="$@"
+# Keep the original command line for extras.sh, which re-parses it. An array,
+# not a string: `args="$@"` flattens every argument into one space-separated
+# scalar, and expanding it unquoted then re-splits on whitespace and globs the
+# result — so a password containing a space or a `*` reached extras.sh as
+# something other than what Jenkins passed in.
+declare -a orig_args=("$@")
 
 while test -n "$1" ; do
     case "$1" in
@@ -115,9 +120,19 @@ function test_empty_fail() {
 }
 
 function fail() {
-    echo $@ >&2
+    # Quoted: unquoted $@ re-splits the message on whitespace, which flattens
+    # any multi-line diagnostic into one line.
+    echo "$@" >&2
     exit 1
 }
+
+# Child scripts we hand control to (extras/extras.sh) guard their downloads
+# with `|| fail "..."` on the assumption that fail is in scope. It is not:
+# they run as separate processes, so the call used to hit `fail: command not
+# found`, the script carried on past a failed download and the release was
+# published with an empty component. Exporting the function makes those
+# guards do what they were written to do.
+export -f fail
 
 # Record the git commit (or other identifying string) of a release
 # component into distr/hashes/<name>. One file per component — mirrors
@@ -281,7 +296,7 @@ function load_core() {
     mkdir -p core
     pushd core > /dev/null
         WGETRC="${wgetrc}" wget -O core.tar.xz "$url_core" || fail "Failed to get Core"
-        tar xvf core.tar.xz
+        tar xvf core.tar.xz || fail "Core tarball is corrupt"
         rm core.tar.xz
         mv isabelle-core ${flavour}-core
     popd > /dev/null
@@ -415,7 +430,7 @@ function load_protostar() {
     pushd core > /dev/null
         WGETRC="${wgetrc}" wget -O protostar.tar.xz "${target_protostar}" \
             || fail "Failed to get protostar"
-        tar xvf protostar.tar.xz
+        tar xvf protostar.tar.xz || fail "Protostar tarball is corrupt"
         rm protostar.tar.xz
         # The protostar tarball ships its own short git hash in `hash`;
         # record it under hashes/ then drop the stray file from the release
@@ -552,7 +567,7 @@ function load_ui() {
             # UI ships as a prebuilt wasm tarball — there is no git
             # checkout to hash, so record the artifact's sha256 instead.
             ui_hash="$(sha256sum ui.tar.xz 2>/dev/null | awk '{print $1}')"
-            tar xvf ui.tar.xz
+            tar xvf ui.tar.xz || fail "UI tarball is corrupt"
             rm ui.tar.xz
         popd > /dev/null
         write_hash "ui" "${ui_hash}"
@@ -604,7 +619,19 @@ function load_extras() {
         rm -rf extras/.git
     fi
 
-    ./extras/extras.sh "$@"
+    ./extras/extras.sh "$@" || fail "Failed to run extras"
+
+    # extras.sh downloads with `wget -O <file>`, which truncates the target
+    # before it knows whether the transfer will succeed: a 401 leaves a
+    # zero-byte tarball behind, and `tar` failing on it is just as invisible
+    # as the download was. Refuse to publish a release with an empty artifact
+    # rather than ship a component that silently kept its previous version on
+    # the target host.
+    local empty
+    empty="$(find "${out_dir}" -type f -empty -name '*.tar.xz' -print 2>/dev/null)"
+    if [ -n "${empty}" ] ; then
+        fail "Extras produced empty artifacts (failed download?):"$'\n'"${empty}"
+    fi
 
     return 0
 }
@@ -639,7 +666,7 @@ function load_plugin() {
     mkdir -p core
     pushd core > /dev/null
         WGETRC="${wgetrc}" wget -O plugin.tar.xz "${url}" || fail "Failed to get plugin"
-        tar xvf plugin.tar.xz
+        tar xvf plugin.tar.xz || fail "Plugin tarball is corrupt"
         rm plugin.tar.xz
     popd > /dev/null
 
@@ -749,7 +776,7 @@ pushd "${out_dir}" > /dev/null
     write_flavour "${flavour}"
 popd > /dev/null
 
-load_extras $args
+load_extras "${orig_args[@]}"
 install_extras
 release_wget_creds
 release_git_creds
