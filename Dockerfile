@@ -13,7 +13,7 @@ ENV HOME="/home/root"
 # Rust comes from rustup below (not apt), so the base image's Rust age is
 # irrelevant — `stable` satisfies the edition2024 crates (need >= 1.85).
 RUN apt-get update && \
-    apt-get install -y build-essential curl git libssl-dev pkg-config python3 wget
+    apt-get install -y build-essential curl git gnupg libssl-dev pkg-config python3 wget
 
 # Rust toolchain via rustup, installed into /opt/rust so any uid (the
 # Jenkins agent runs under a non-root uid) can read + execute it. The

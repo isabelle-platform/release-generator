@@ -37,13 +37,21 @@ pipeline {
       stages {
         stage('Download (Linux)') {
           steps {
-            withCredentials([usernamePassword(credentialsId: 'relgen_repo_creds', usernameVariable: 'RELEASES_USERNAME', passwordVariable: 'RELEASES_PASSWORD')]) {
-              withCredentials([usernamePassword(credentialsId: 'relgen_gh_creds', usernameVariable: 'GH_USERNAME', passwordVariable: 'GH_PASSWORD')]) {
-                sh "echo ${params.FLAVOUR} > .flavour"
-                sh './release.sh --releases-login "${RELEASES_USERNAME}" --releases-password "${RELEASES_PASSWORD}" --gh-login "${GH_USERNAME}" --gh-password "${GH_PASSWORD}" --flavour "$(cat .flavour)" --out out'
-                sh "cp out/release.tar.xz out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz"
-                sh "cp out/release.tar.xz out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz"
-              }
+            // GPG_PASSPHRASE is read from the environment by release.sh
+            // (not passed as an argument) so it stays out of argv on the
+            // agent. Jenkins masks both secrets in the console log.
+            withCredentials([usernamePassword(credentialsId: 'relgen_repo_creds', usernameVariable: 'RELEASES_USERNAME', passwordVariable: 'RELEASES_PASSWORD'),
+                             usernamePassword(credentialsId: 'relgen_gh_creds', usernameVariable: 'GH_USERNAME', passwordVariable: 'GH_PASSWORD'),
+                             file(credentialsId: 'relgen_gpg_key', variable: 'GPG_KEY_FILE'),
+                             string(credentialsId: 'relgen_gpg_passphrase', variable: 'GPG_PASSPHRASE')]) {
+              sh "echo ${params.FLAVOUR} > .flavour"
+              sh './release.sh --releases-login "${RELEASES_USERNAME}" --releases-password "${RELEASES_PASSWORD}" --gh-login "${GH_USERNAME}" --gh-password "${GH_PASSWORD}" --gpg-key "${GPG_KEY_FILE}" --flavour "$(cat .flavour)" --out out'
+              sh "cp out/release.tar.xz out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz"
+              sh "cp out/release.tar.xz out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz"
+              // The signature covers release.tar.xz, and the copies above are
+              // byte-identical to it, so the same .asc verifies all of them.
+              sh "cp out/release.tar.xz.asc out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz.asc"
+              sh "cp out/release.tar.xz.asc out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz.asc"
             }
           }
         }
@@ -74,7 +82,7 @@ pipeline {
                                 remoteDirectory: '${BRANCH_NAME}-${BUILD_NUMBER}',
                                 remoteDirectorySDF: false,
                                 removePrefix: 'out',
-                                sourceFiles: "out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz"
+                                sourceFiles: "out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz, out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz.asc"
                               ]],
                             usePromotionTimestamp: false,
                             useWorkspaceInPromotion: false,
@@ -105,7 +113,7 @@ pipeline {
                                 remoteDirectory: "${BRANCH_NAME}-latest",
                                 remoteDirectorySDF: false,
                                 removePrefix: 'out',
-                                sourceFiles: "out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz"
+                                sourceFiles: "out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz, out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz.asc"
                               ]],
                             usePromotionTimestamp: false,
                             useWorkspaceInPromotion: false,

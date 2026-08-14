@@ -10,6 +10,13 @@ flavour=""
 # Branch of isabelle-core to build from. Defaults to main; override with
 # --core-branch to release-test a feature branch.
 core_branch="main"
+# OpenPGP private key used to sign the release tarball. Empty means "don't
+# sign" so local runs work without a key; CI always passes one. The
+# passphrase, if the key has one, comes from ${GPG_PASSPHRASE} rather than
+# the command line — argv is world-readable via /proc on the build agent.
+gpg_key=""
+# Fingerprint of the imported signing key; set by put_gpg_key.
+gpg_key_id=""
 # Keep the original command line for extras.sh, which re-parses it. An array,
 # not a string: `args="$@"` flattens every argument into one space-separated
 # scalar, and expanding it unquoted then re-splits on whitespace and globs the
@@ -45,6 +52,10 @@ while test -n "$1" ; do
             ;;
         --core-branch)
             core_branch="$2"
+            shift 1
+            ;;
+        --gpg-key)
+            gpg_key="$2"
             shift 1
             ;;
         *)
@@ -192,6 +203,102 @@ function put_wget_creds() {
 
 function release_wget_creds() {
     rm $(pwd)/.wgetrc
+}
+
+# Import the release signing key into a throwaway GNUPGHOME, so we never
+# touch the build agent's real keyring and the whole thing can be wiped in
+# one rm. Called early on purpose: a bad or missing key should fail the run
+# before the half-hour build, not after it.
+function put_gpg_key() {
+    local key_file="$1"
+
+    if [ -z "${key_file}" ] ; then
+        echo "WARNING: no --gpg-key given, release will NOT be signed" >&2
+        return 0
+    fi
+    [ -f "${key_file}" ] || fail "GPG key file not found: ${key_file}"
+
+    # Deliberately NOT under the workspace: gpg-agent puts its socket inside
+    # GNUPGHOME, and a unix socket path is capped at ~104 chars — a deep
+    # Jenkins workspace path blows that limit and the agent refuses to start.
+    GNUPGHOME="$(mktemp -d "${TMPDIR:-/tmp}/relgen-gnupg.XXXXXX")" \
+        || fail "Failed to create temporary GNUPGHOME"
+    export GNUPGHOME
+    chmod 700 "${GNUPGHOME}"
+
+    # Wipe the key material even if a later stage dies. release_gpg_key is
+    # idempotent, so the explicit call at the end of the run is harmless.
+    trap release_gpg_key EXIT
+
+    gpg --batch --quiet --import "${key_file}" \
+        || fail "Failed to import GPG signing key"
+
+    # Sign by fingerprint rather than by uid: unambiguous if the key file
+    # ever carries more than one secret key.
+    gpg_key_id="$(gpg --batch --with-colons --list-secret-keys \
+                  | awk -F: '/^fpr:/ { print $10 ; exit }')"
+    [ -n "${gpg_key_id}" ] || fail "No secret key found in ${key_file}"
+    echo "Imported GPG signing key ${gpg_key_id}"
+}
+
+function release_gpg_key() {
+    [ -n "${GNUPGHOME}" ] || return 0
+
+    # The agent holds the unlocked key in memory and keeps a socket in
+    # GNUPGHOME; kill it before removing the directory.
+    gpgconf --kill gpg-agent > /dev/null 2>&1 || true
+    rm -rf "${GNUPGHOME}"
+    unset GNUPGHOME
+}
+
+# Detached OpenPGP signature written next to the artifact as <file>.asc.
+# Detached rather than attached so the published tarball stays a plain
+# tarball: existing consumers keep fetching it unchanged, and the signature
+# is simply an extra file they may ignore until they're taught to check it.
+function sign_file() {
+    local file="$1"
+
+    [ -n "${gpg_key_id}" ] || return 0
+
+    rm -f "${file}.asc"
+    # --passphrase-fd over a pipe, not --passphrase: keeps the secret out of
+    # argv. An unprotected key just ignores the empty input.
+    printf '%s' "${GPG_PASSPHRASE:-}" \
+        | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+              --local-user "${gpg_key_id}" \
+              --armor --detach-sign --output "${file}.asc" "${file}" \
+        || fail "Failed to sign ${file}"
+    echo "Signed ${file} -> ${file}.asc"
+}
+
+# Re-check the signature we just produced against the public key that ships
+# to the hosts in scripts/. Catches the one mistake that would brick every
+# installation at once: a CI signing key that no longer matches the key
+# clients trust. Cheap here, unfixable once the release is out.
+function verify_signature() {
+    local file="$1"
+    local pubkey="$2"
+
+    [ -n "${gpg_key_id}" ] || return 0
+    [ -f "${pubkey}" ] \
+        || fail "Public key missing: ${pubkey} — clients would not be able to verify this release"
+
+    local vhome
+    vhome="$(mktemp -d "${TMPDIR:-/tmp}/relgen-verify.XXXXXX")" \
+        || fail "Failed to create a temporary keyring"
+    chmod 700 "${vhome}"
+
+    local rc=0
+    GNUPGHOME="${vhome}" gpg --batch --quiet --import "${pubkey}" || rc=1
+    if [ ${rc} -eq 0 ] ; then
+        GNUPGHOME="${vhome}" gpg --batch --verify "${file}.asc" "${file}" || rc=2
+    fi
+    GNUPGHOME="${vhome}" gpgconf --kill gpg-agent > /dev/null 2>&1 || true
+    rm -rf "${vhome}"
+
+    [ ${rc} -eq 0 ] \
+        || fail "Signature does not verify against ${pubkey} — the CI signing key and the key shipped to clients disagree"
+    echo "Signature verified against ${pubkey}"
 }
 
 # Configure git's `store` credential helper backed by a per-run file. Once
@@ -728,6 +835,8 @@ function write_flavour() {
 
 function write_release() {
     tar cJvf release.tar.xz .flavour *
+    sign_file "$(pwd)/release.tar.xz"
+    verify_signature "$(pwd)/release.tar.xz" "$(pwd)/scripts/isabelle-release-pubkey.asc"
     return 0
 }
 
@@ -742,6 +851,8 @@ test_flavour "$flavour"
 # Set git credentials BEFORE the first clone — datagen/extras live in
 # private GitHub orgs and the URLs no longer carry inline creds.
 put_git_creds "$gh_login" "$gh_password"
+
+put_gpg_key "$gpg_key"
 
 # Create the output dir up front and make its path absolute, so helpers
 # that run from varying working directories (write_hash) can reliably
@@ -784,3 +895,6 @@ release_git_creds
 pushd "${out_dir}"
 write_release
 popd
+
+# Signing is the last thing that needs the key — drop it immediately.
+release_gpg_key
