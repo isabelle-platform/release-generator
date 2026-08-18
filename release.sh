@@ -436,6 +436,16 @@ function load_core() {
     return 0
 }
 
+function cargo_jobs() {
+    local cpus
+
+    cpus="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null)"
+    [ -n "${cpus}" ] || cpus=1
+    [ "${cpus}" -gt 2 ] || { echo 1 ; return 0 ; }
+
+    echo $(( cpus / 2 ))
+}
+
 # Build the core binary from source for the given flavour.
 #
 # The plugin set for each flavour is defined by `flavours/<flavour>.json`
@@ -492,8 +502,11 @@ function build_core() {
         "${flavour_json}" \
         || fail "Failed to generate shell crate for ${flavour}"
 
+    local jobs="${CARGO_BUILD_JOBS:-$(cargo_jobs)}"
+    echo "Building core shell with ${jobs} parallel job(s)"
+
     pushd "${build_root}/shell" > /dev/null
-        cargo build --release \
+        cargo build --release --jobs "${jobs}" \
             || fail "Failed to build core shell for ${flavour}"
     popd > /dev/null
 
