@@ -23,6 +23,13 @@ gpg_key_id=""
 # result — so a password containing a space or a `*` reached extras.sh as
 # something other than what Jenkins passed in.
 declare -a orig_args=("$@")
+# Options extras.sh must not see. It lives in a separate repo (per flavour),
+# re-parses our command line and hard-fails on anything it doesn't recognise,
+# so every option we add here would otherwise have to be added to each extras
+# repo in lockstep. Signing is done by release.sh on the finished tarball —
+# extras has no use for the key. Value-taking options only; the value is
+# dropped along with the flag.
+declare -a extras_skip_args=("--gpg-key")
 
 while test -n "$1" ; do
     case "$1" in
@@ -64,6 +71,24 @@ while test -n "$1" ; do
             ;;
     esac
     shift 1
+done
+
+# Filter extras_skip_args (and their values) out of the command line handed
+# to extras.sh.
+declare -a extras_args=()
+declare -i skip_next=0
+for arg in "${orig_args[@]}" ; do
+    if [ ${skip_next} -eq 1 ] ; then
+        skip_next=0
+        continue
+    fi
+    for skip in "${extras_skip_args[@]}" ; do
+        if [ "${arg}" == "${skip}" ] ; then
+            skip_next=1
+            break
+        fi
+    done
+    [ ${skip_next} -eq 1 ] || extras_args+=("${arg}")
 done
 
 url_core="https://releases.interpretica.io/isabelle-core/branches/main/isabelle-core-main-latest-linux-x86_64.tar.xz"
@@ -887,7 +912,7 @@ pushd "${out_dir}" > /dev/null
     write_flavour "${flavour}"
 popd > /dev/null
 
-load_extras "${orig_args[@]}"
+load_extras "${extras_args[@]}"
 install_extras
 release_wget_creds
 release_git_creds
