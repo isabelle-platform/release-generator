@@ -135,7 +135,7 @@ url_protostar_cfgs="https://github.com/interpretica-io/protostar-cfgs.git"
 url_horizon_release="https://api.github.com/repos/interpretica-io/horizon/releases/latest"
 
 url_datagen_zine="https://github.com/interpretica-io/zine-data-gen.git"
-url_ui_zine="https://releases.interpretica.io/zine/branches/main/zine-main-latest-wasm.tar.xz"
+url_ui_zine="https://releases.interpretica.io/zine-ui/branches/main/zine-ui-main-latest-wasm.tar.xz"
 
 url_scripts="https://github.com/isabelle-platform/isabelle-scripts.git"
 
