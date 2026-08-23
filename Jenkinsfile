@@ -3,7 +3,7 @@ pipeline {
     copyArtifactPermission("*");
   }
   parameters {
-    choice(name: "FLAVOUR", choices: ["none", "intranet", "cloudcpe", "midair", "proteos"], description: "Isabelle flavour (default 'none' builds nothing)")
+    choice(name: "FLAVOUR", choices: ["none", "intranet", "cloudcpe", "midair", "proteos", "zine"], description: "Isabelle flavour (default 'none' builds nothing)")
   }
   agent {
     dockerfile {
