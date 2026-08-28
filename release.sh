@@ -354,6 +354,13 @@ function put_git_creds() {
     : > "$GIT_CONFIG_GLOBAL"
     git config --file "$GIT_CONFIG_GLOBAL" credential.helper "store --file=$cred_file"
 
+    # The build container runs as root (it needs the host's docker socket),
+    # while the workspace and the clones a previous run left in it belong to
+    # the Jenkins uid. Git refuses to touch a repository owned by someone else
+    # ("dubious ownership"), so mark them safe. This config is per-run and
+    # deleted with the credentials afterwards.
+    git config --file "$GIT_CONFIG_GLOBAL" --add safe.directory "*"
+
     # Cargo uses libgit2 by default, which does NOT honour credential
     # helpers. Switch it to system git so private deps resolve via the
     # same .git-credentials we just wrote.
