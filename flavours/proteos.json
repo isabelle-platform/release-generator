@@ -2,7 +2,7 @@
   {
     "name": "isabelle-plugin-security",
     "url": "https://github.com/isabelle-platform/isabelle-plugin-security",
-    "tag": "1.20.0"
+    "tag": "1.22.0"
   },
   {
     "name": "isabelle-plugin-proteos",
