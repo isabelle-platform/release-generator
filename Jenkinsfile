@@ -10,9 +10,14 @@ pipeline {
       filename 'Dockerfile'
       dir '.'
       /* Builds that spawn a container use the host's daemon through its
-         socket. Root because that socket is root:docker and the agent's uid
-         belongs to no such group in here. */
-      args '--mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock -u 0:0'
+         socket. The socket is root:docker, and Jenkins starts the container
+         under the agent's uid without its supplementary groups, so the docker
+         group has to be added explicitly. Set DOCKER_GID as a global Jenkins
+         env var if the host's group id differs from the default below
+         (`stat -c %g /var/run/docker.sock` on the agent).
+         Deliberately NOT `-u 0:0`: running as root leaves root-owned files in
+         the workspace, and Jenkins' own `git clean -fdx` then fails. */
+      args "--mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock --group-add ${env.DOCKER_GID ?: '999'}"
     }
   }
   environment {
