@@ -9,6 +9,10 @@ pipeline {
     dockerfile {
       filename 'Dockerfile'
       dir '.'
+      /* Builds that spawn a container use the host's daemon through its
+         socket. Root because that socket is root:docker and the agent's uid
+         belongs to no such group in here. */
+      args '--mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock -u 0:0'
     }
   }
   environment {

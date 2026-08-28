@@ -15,6 +15,20 @@ ENV HOME="/home/root"
 RUN apt-get update && \
     apt-get install -y build-essential curl git gnupg libssl-dev pkg-config python3 wget
 
+# Docker CLI — client only. The Jenkinsfile bind-mounts the host's
+# /var/run/docker.sock, so builds that need to run a container use the host's
+# daemon. Docker's own apt repo gives docker-ce-cli without dragging in the
+# engine that `docker.io` would.
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    chmod a+r /etc/apt/keyrings/docker.gpg && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/ubuntu jammy stable" \
+      > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && \
+    apt-get install -y docker-ce-cli
+
 # Rust toolchain via rustup, installed into /opt/rust so any uid (the
 # Jenkins agent runs under a non-root uid) can read + execute it. The
 # release script overrides CARGO_HOME at runtime to a workspace-local
