@@ -367,6 +367,11 @@ function put_git_creds() {
     export CARGO_HOME="$(pwd)/.cargo-home"
     mkdir -p "$CARGO_HOME"
 
+    # Same reason for the Docker CLI: it insists on a config dir under $HOME
+    # and fails with `mkdir /home/root/.docker: permission denied` otherwise.
+    export DOCKER_CONFIG="$(pwd)/.docker"
+    mkdir -p "$DOCKER_CONFIG"
+
     echo "Put git credentials to ${cred_file} (global config: ${GIT_CONFIG_GLOBAL})"
 }
 
@@ -374,6 +379,7 @@ function release_git_creds() {
     rm -f "$(pwd)/.git-credentials" "$(pwd)/.gitconfig-run"
     unset GIT_CONFIG_GLOBAL
     unset CARGO_NET_GIT_FETCH_WITH_CLI
+    unset DOCKER_CONFIG
     # CARGO_HOME (.cargo-home) is intentionally left in place — it's just a
     # cache and speeds up subsequent runs in a reused workspace.
     unset CARGO_HOME
