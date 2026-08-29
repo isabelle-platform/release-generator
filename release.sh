@@ -508,6 +508,15 @@ function build_core() {
         "${flavour_json}" \
         || fail "Failed to generate shell crate for ${flavour}"
 
+    # The shell crate is regenerated on every run, but its Cargo.lock survives
+    # in build-shell, which is kept between builds for speed. A lock that
+    # outlives the crate pins commits the tags may no longer point at: when a
+    # tag is re-cut upstream, the stale pin and the fresh resolution both end
+    # up in the graph and the build fails with two versions of one crate. The
+    # tags in the flavour json and the plugins' manifests are the real pin, so
+    # resolve from them every time.
+    rm -f "${build_root}/shell/Cargo.lock"
+
     local jobs="${CARGO_BUILD_JOBS:-$(cargo_jobs)}"
     echo "Building core shell with ${jobs} parallel job(s)"
 
