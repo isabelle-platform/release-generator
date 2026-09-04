@@ -10,10 +10,14 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN mkdir -p /home/root
 ENV HOME="/home/root"
 
+# patchelf: the core may link native libraries that plugin build scripts
+# produce, and the release ships them beside the binary under core/lib with
+# an $ORIGIN rpath stamped post-link — see bundle_native_libs in release.sh.
 # Rust comes from rustup below (not apt), so the base image's Rust age is
 # irrelevant — `stable` satisfies the edition2024 crates (need >= 1.85).
 RUN apt-get update && \
-    apt-get install -y build-essential clang curl git gnupg libclang-dev libssl-dev pkg-config python3 wget
+    apt-get install -y build-essential clang curl git gnupg libclang-dev libssl-dev pkg-config python3 wget \
+        patchelf
 
 # Docker CLI — client only. The Jenkinsfile bind-mounts the host's
 # /var/run/docker.sock, so builds that need to run a container use the host's

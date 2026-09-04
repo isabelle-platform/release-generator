@@ -452,6 +452,70 @@ function cargo_jobs() {
     echo $(( cpus / 2 ))
 }
 
+# Ship the native libraries the core was linked against, and make it find them.
+#
+# Some plugins link a native library their build script produces. Cargo puts
+# the linker's rpath on the plugin crate, not on the final binary
+# (`rustc-link-arg` does not cross crate boundaries), so the binary leaves the
+# build with no rpath at all and the library exists nowhere but in the build
+# tree. On the machine the archive is unpacked on, the service starts, prints
+# "cannot open shared object file", and exits 0 — and nothing downstream is
+# told.
+#
+# By convention such build scripts publish where they put the library as
+# `cargo:lib_dir=` in their output (the same contract isabelle-core's
+# tools/fix_rpath.sh reads for local builds). Collect those, copy every shared
+# library in them to core/lib beside the binary, and stamp $ORIGIN/lib as the
+# rpath so the binary finds them wherever the archive is unpacked.
+#
+# Only the current build's output dirs count: target/*/build accumulates one
+# per build-script run and is never pruned, so newest per package wins.
+#
+# Ends with the check that would have caught this: nothing the binary needs
+# may be "not found" on the build host. The build host is the deployment
+# image, so what ldd cannot find here, the service will not find there.
+function bundle_native_libs() {
+    local binary="$1"
+    local profile_dir="$2"
+    local libdir
+    libdir="$(dirname "${binary}")/lib"
+
+    local lib_dirs
+    lib_dirs="$(
+        ls -t "${profile_dir}"/build/*/output 2>/dev/null | while read -r out ; do
+            pkg="$(basename "$(dirname "${out}")" | sed 's/-[0-9a-f]*$//')"
+            grep -hs '^cargo:lib_dir=' "${out}" | sed "s|^cargo:lib_dir=|${pkg} |"
+        done | awk '!seen[$1]++ { print $2 }'
+    )"
+
+    if [ -n "${lib_dirs}" ] ; then
+        command -v patchelf > /dev/null \
+            || fail "the core links native libraries but patchelf is not installed to make it find them"
+        mkdir -p "${libdir}"
+        local d n=0
+        for d in ${lib_dirs} ; do
+            [ -d "${d}" ] || continue
+            local f
+            for f in "${d}"/*.so "${d}"/*.so.* ; do
+                [ -f "${f}" ] || continue
+                cp -L "${f}" "${libdir}/"
+                echo "Bundled $(basename "${f}") from ${d}"
+                n=$((n + 1))
+            done
+        done
+        [ "${n}" -gt 0 ] || fail "native library dirs were published (${lib_dirs}) but hold no .so — the build is not what it claims"
+        patchelf --set-rpath '$ORIGIN/lib' "${binary}" \
+            || fail "could not set the rpath on ${binary}"
+    fi
+
+    # Whatever was or was not bundled, the binary has to resolve here.
+    local missing
+    missing="$(ldd "${binary}" 2>/dev/null | awk '/not found/ { print $1 }')"
+    if [ -n "${missing}" ] ; then
+        fail "$(basename "${binary}") cannot find: $(echo ${missing} | tr '\n' ' ') — a release that would not start"
+    fi
+}
+
 # Build the core binary from source for the given flavour.
 #
 # The plugin set for each flavour is defined by `flavours/<flavour>.json`
@@ -530,6 +594,7 @@ function build_core() {
         "core/${flavour}-core" \
         || fail "Built binary missing"
     chmod +x "core/${flavour}-core"
+    bundle_native_libs "core/${flavour}-core" "${build_root}/shell/target/release"
 
     # run.sh wrapper lives in the core repo we just cloned.
     if [ -f "${build_root}/isabelle-core/run.sh" ] ; then
