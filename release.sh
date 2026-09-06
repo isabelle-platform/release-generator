@@ -508,10 +508,22 @@ function bundle_native_libs() {
             || fail "could not set the rpath on ${binary}"
 
         # A bundled library may need another one that its build script put
-        # somewhere else in the build tree, and a build script only publishes
-        # its own output dir. Ask the loader what is still missing and go and
-        # get it, until nothing is — or until something is missing that the
-        # build tree does not have either, which is a real failure.
+        # somewhere else, and a build script only publishes its own output
+        # dir. That somewhere is almost always inside the same build the
+        # published dir came out of — a sibling or a parent directory — which
+        # need not be under target/ at all: a build script may keep its work
+        # in a cache of its own. So the search covers each published dir, the
+        # two levels above it, and cargo's own build dir, to a bounded depth.
+        # Ask the loader what is still missing and go and get it, until
+        # nothing is — or until something is missing that none of those
+        # places have, which is a real failure.
+        local roots="" r
+        for d in ${lib_dirs} ; do
+            for r in "${d}" "$(dirname "${d}")" "$(dirname "$(dirname "${d}")")" ; do
+                case " ${roots} " in *" ${r} "*) ;; *) roots="${roots} ${r}" ;; esac
+            done
+        done
+        roots="${roots} ${profile_dir}/build"
         #
         # Each library also gets $ORIGIN as its own rpath. The binary's
         # RUNPATH is consulted for the binary's needs only, not for what its
@@ -525,9 +537,13 @@ function bundle_native_libs() {
             missing="$(ldd "${binary}" 2>/dev/null | awk '/not found/ { print $1 }')"
             [ -n "${missing}" ] || break
             for lib in ${missing} ; do
-                found="$(find "${profile_dir}/build" \( -type f -o -type l \) -name "${lib}" 2>/dev/null | head -1)"
+                found=""
+                for r in ${roots} ; do
+                    found="$(find "${r}" -maxdepth 6 \( -type f -o -type l \) -name "${lib}" 2>/dev/null | head -1)"
+                    [ -n "${found}" ] && break
+                done
                 [ -n "${found}" ] \
-                    || fail "$(basename "${binary}") needs ${lib}, and the build tree does not have it — a release that would not start"
+                    || fail "$(basename "${binary}") needs ${lib}, and none of the build dirs have it (looked in:${roots}) — a release that would not start"
                 cp -L "${found}" "${libdir}/${lib}"
                 echo "Bundled ${lib} from $(dirname "${found}")"
             done
