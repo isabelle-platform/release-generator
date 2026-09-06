@@ -477,7 +477,7 @@ function cargo_jobs() {
 function bundle_native_libs() {
     local binary="$1"
     local profile_dir="$2"
-    local libdir
+    local libdir missing
     libdir="$(dirname "${binary}")/lib"
 
     local lib_dirs
@@ -506,10 +506,35 @@ function bundle_native_libs() {
         [ "${n}" -gt 0 ] || fail "native library dirs were published (${lib_dirs}) but hold no .so — the build is not what it claims"
         patchelf --set-rpath '$ORIGIN/lib' "${binary}" \
             || fail "could not set the rpath on ${binary}"
+
+        # A bundled library may need another one that its build script put
+        # somewhere else in the build tree, and a build script only publishes
+        # its own output dir. Ask the loader what is still missing and go and
+        # get it, until nothing is — or until something is missing that the
+        # build tree does not have either, which is a real failure.
+        #
+        # Each library also gets $ORIGIN as its own rpath. The binary's
+        # RUNPATH is consulted for the binary's needs only, not for what its
+        # libraries need in turn, so without this a bundled library would look
+        # for its siblings in the build tree it came from.
+        local pass lib found
+        for pass in 1 2 3 4 5 ; do
+            for f in "${libdir}"/* ; do
+                [ -f "${f}" ] && patchelf --set-rpath '$ORIGIN' "${f}" 2>/dev/null || true
+            done
+            missing="$(ldd "${binary}" 2>/dev/null | awk '/not found/ { print $1 }')"
+            [ -n "${missing}" ] || break
+            for lib in ${missing} ; do
+                found="$(find "${profile_dir}/build" \( -type f -o -type l \) -name "${lib}" 2>/dev/null | head -1)"
+                [ -n "${found}" ] \
+                    || fail "$(basename "${binary}") needs ${lib}, and the build tree does not have it — a release that would not start"
+                cp -L "${found}" "${libdir}/${lib}"
+                echo "Bundled ${lib} from $(dirname "${found}")"
+            done
+        done
     fi
 
     # Whatever was or was not bundled, the binary has to resolve here.
-    local missing
     missing="$(ldd "${binary}" 2>/dev/null | awk '/not found/ { print $1 }')"
     if [ -n "${missing}" ] ; then
         fail "$(basename "${binary}") cannot find: $(echo ${missing} | tr '\n' ' ') — a release that would not start"
