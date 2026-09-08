@@ -477,7 +477,7 @@ function cargo_jobs() {
 function bundle_native_libs() {
     local binary="$1"
     local profile_dir="$2"
-    local libdir missing
+    local libdir missing unusable
     libdir="$(dirname "${binary}")/lib"
 
     local lib_dirs
@@ -534,7 +534,19 @@ function bundle_native_libs() {
             for f in "${libdir}"/* ; do
                 [ -f "${f}" ] && patchelf --set-rpath '$ORIGIN' "${f}" 2>/dev/null || true
             done
-            missing="$(ldd "${binary}" 2>/dev/null | awk '/not found/ { print $1 }')"
+            # Two kinds of "not found", and only one of them is ours to fix.
+            # `libx.so => not found` is a library that is not there — go and
+            # get it. Anything else — `version 'GLIBC_2.38' not found
+            # (required by …)` — is a library that is there and cannot be
+            # used on this system, and no amount of copying changes that.
+            # That one fails now, with ldd's own words, since the next line of
+            # this script would otherwise ask the build tree for a file named
+            # after the binary.
+            unusable="$(ldd "${binary}" 2>/dev/null | grep 'not found' | grep -v ' => not found' || true)"
+            [ -z "${unusable}" ] \
+                || fail "$(basename "${binary}") would not start on this system:
+${unusable}"
+            missing="$(ldd "${binary}" 2>/dev/null | awk '/ => not found/ { print $1 }')"
             [ -n "${missing}" ] || break
             for lib in ${missing} ; do
                 found=""
@@ -550,10 +562,13 @@ function bundle_native_libs() {
         done
     fi
 
-    # Whatever was or was not bundled, the binary has to resolve here.
-    missing="$(ldd "${binary}" 2>/dev/null | awk '/not found/ { print $1 }')"
+    # Whatever was or was not bundled, the binary has to resolve here. Said in
+    # ldd's own words: a library that is missing and one that is present but
+    # unusable read differently, and the difference is the whole diagnosis.
+    missing="$(ldd "${binary}" 2>/dev/null | grep 'not found' || true)"
     if [ -n "${missing}" ] ; then
-        fail "$(basename "${binary}") cannot find: $(echo ${missing} | tr '\n' ' ') — a release that would not start"
+        fail "$(basename "${binary}") would not start:
+${missing}"
     fi
 }
 
