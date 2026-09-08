@@ -7,7 +7,7 @@
   {
     "name": "isabelle-plugin-intranet",
     "url": "https://github.com/isabelle-platform/isabelle-plugin-intranet",
-    "tag": "1.15.0"
+    "tag": "1.15.1"
   },
   {
     "name": "isabelle-plugin-web",
