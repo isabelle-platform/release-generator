@@ -2,11 +2,11 @@
   {
     "name": "isabelle-plugin-security",
     "url": "https://github.com/isabelle-platform/isabelle-plugin-security",
-    "tag": "1.23.0"
+    "tag": "1.24.0"
   },
   {
     "name": "isabelle-plugin-proteos",
     "url": "https://github.com/interpretica-io/isabelle-plugin-proteos",
-    "tag": "0.9.0"
+    "tag": "0.9.1"
   }
 ]

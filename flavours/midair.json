@@ -2,11 +2,11 @@
   {
     "name": "isabelle-plugin-security",
     "url": "https://github.com/isabelle-platform/isabelle-plugin-security",
-    "tag": "1.23.0"
+    "tag": "1.24.0"
   },
   {
     "name": "isabelle-plugin-midair",
     "url": "https://github.com/interpretica-io/isabelle-plugin-midair",
-    "tag": "1.26.0"
+    "tag": "1.27.0"
   }
 ]

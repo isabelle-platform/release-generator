@@ -2,16 +2,16 @@
   {
     "name": "isabelle-plugin-security",
     "url": "https://github.com/isabelle-platform/isabelle-plugin-security",
-    "tag": "1.23.0"
+    "tag": "1.24.0"
   },
   {
     "name": "isabelle-plugin-intranet",
     "url": "https://github.com/isabelle-platform/isabelle-plugin-intranet",
-    "tag": "1.16.2"
+    "tag": "1.16.3"
   },
   {
     "name": "isabelle-plugin-web",
     "url": "https://github.com/isabelle-platform/isabelle-plugin-web",
-    "tag": "1.15.1"
+    "tag": "1.15.2"
   }
 ]
