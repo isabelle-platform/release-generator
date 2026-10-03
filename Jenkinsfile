@@ -68,69 +68,60 @@ pipeline {
     }
     stage('Publish artifacts') {
       when { expression { params.FLAVOUR != "none" } }
-      parallel {
-        stage('Publish branch artifacts') {
-          steps {
-            ftpPublisher alwaysPublishFromMaster: true,
-                         continueOnError: false,
-                         failOnError: false,
-                         masterNodeName: '',
-                         paramPublish: null,
-                         publishers: [
+      // One ftpPublisher with two transfers, not two parallel stages. The
+      // transfers run sequentially over a single connection, so each remote
+      // directory (`${BRANCH_NAME}-${BUILD_NUMBER}` and `${BRANCH_NAME}-latest`)
+      // is entered and, when missing, created (MKD) in turn.
+      //
+      // The previous form published these as two parallel stages against the
+      // same FTP configName. Their sessions interleaved on one connection, and
+      // the `-latest` directory's MKD was lost to the race: `CWD main-latest`
+      // returned 550, no MKD followed, and the latest files were written under
+      // `main-<N>` instead. With `main-latest/` never created, the default
+      // download path (every flavour's update.sh fetches `.../main-latest/...`)
+      // fell through nginx to the site's index page and signature checks failed.
+      steps {
+        ftpPublisher alwaysPublishFromMaster: true,
+                     continueOnError: false,
+                     failOnError: false,
+                     masterNodeName: '',
+                     paramPublish: null,
+                     publishers: [
+                      [
+                        configName: "${env.FTP_CONFIG}",
+                        transfers: [
                           [
-                            configName: "${env.FTP_CONFIG}",
-                            transfers:
-                              [[
-                                asciiMode: false,
-                                cleanRemote: false,
-                                excludes: '',
-                                flatten: false,
-                                makeEmptyDirs: false,
-                                noDefaultExcludes: false,
-                                patternSeparator: '[, ]+',
-                                remoteDirectory: '${BRANCH_NAME}-${BUILD_NUMBER}',
-                                remoteDirectorySDF: false,
-                                removePrefix: 'out',
-                                sourceFiles: "out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz, out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz.asc"
-                              ]],
-                            usePromotionTimestamp: false,
-                            useWorkspaceInPromotion: false,
-                            verbose: true
-                          ]
-                        ]
-          }
-        }
-        stage('Publish latest artifacts') {
-          steps {
-            ftpPublisher alwaysPublishFromMaster: true,
-                         continueOnError: false,
-                         failOnError: false,
-                         masterNodeName: '',
-                         paramPublish: null,
-                         publishers: [
+                            asciiMode: false,
+                            cleanRemote: false,
+                            excludes: '',
+                            flatten: false,
+                            makeEmptyDirs: false,
+                            noDefaultExcludes: false,
+                            patternSeparator: '[, ]+',
+                            remoteDirectory: '${BRANCH_NAME}-${BUILD_NUMBER}',
+                            remoteDirectorySDF: false,
+                            removePrefix: 'out',
+                            sourceFiles: "out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz, out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz.asc"
+                          ],
                           [
-                            configName: "${env.FTP_CONFIG}",
-                            transfers:
-                              [[
-                                asciiMode: false,
-                                cleanRemote: false,
-                                excludes: '',
-                                flatten: false,
-                                makeEmptyDirs: false,
-                                noDefaultExcludes: false,
-                                patternSeparator: '[, ]+',
-                                remoteDirectory: "${BRANCH_NAME}-latest",
-                                remoteDirectorySDF: false,
-                                removePrefix: 'out',
-                                sourceFiles: "out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz, out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz.asc"
-                              ]],
-                            usePromotionTimestamp: false,
-                            useWorkspaceInPromotion: false,
-                            verbose: true
+                            asciiMode: false,
+                            cleanRemote: false,
+                            excludes: '',
+                            flatten: false,
+                            makeEmptyDirs: false,
+                            noDefaultExcludes: false,
+                            patternSeparator: '[, ]+',
+                            remoteDirectory: '${BRANCH_NAME}-latest',
+                            remoteDirectorySDF: false,
+                            removePrefix: 'out',
+                            sourceFiles: "out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz, out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz.asc"
                           ]
-                        ]
-          }
-        }
+                        ],
+                        usePromotionTimestamp: false,
+                        useWorkspaceInPromotion: false,
+                        verbose: true
+                      ]
+                    ]
       }
     }
   }
