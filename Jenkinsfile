@@ -127,16 +127,16 @@ pipeline {
   }
   post {
     success {
-      sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER}: PASSED. See details in ${BUILD_URL}"'
+      sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER} (${FLAVOUR}): PASSED. See details in ${BUILD_URL}"'
     }
     failure {
-      sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER}: FAILED. See details in ${BUILD_URL}"'
+      sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER} (${FLAVOUR}): FAILED. See details in ${BUILD_URL}"'
     }
     aborted {
-      sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER}: ABORTED. See details in ${BUILD_URL}"'
+      sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER} (${FLAVOUR}): ABORTED. See details in ${BUILD_URL}"'
     }
     unstable {
-      sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER}: UNSTABLE. See details in ${BUILD_URL}"'
+      sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER} (${FLAVOUR}): UNSTABLE. See details in ${BUILD_URL}"'
     }
   }
 }
