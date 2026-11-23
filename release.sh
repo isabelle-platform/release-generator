@@ -29,7 +29,7 @@ declare -a orig_args=("$@")
 # repo in lockstep. Signing is done by release.sh on the finished tarball —
 # extras has no use for the key. Value-taking options only; the value is
 # dropped along with the flag.
-declare -a extras_skip_args=("--gpg-key")
+declare -a extras_skip_args=("--gpg-key" "--name")
 
 while test -n "$1" ; do
     case "$1" in
@@ -63,6 +63,13 @@ while test -n "$1" ; do
             ;;
         --gpg-key)
             gpg_key="$2"
+            shift 1
+            ;;
+        # The name the release is published under, e.g. `main-554`. Kept in
+        # the archive (distr/hashes/release), so an installation can say which
+        # build it runs even when it was fetched as `main-latest`.
+        --name)
+            release_name="$2"
             shift 1
             ;;
         *)
@@ -1033,6 +1040,12 @@ put_gpg_key "$gpg_key"
 # write into ${out_dir}/distr/hashes regardless of the current cwd.
 mkdir -p "${out_dir}"
 out_dir="$(cd "${out_dir}" && pwd)"
+
+# Which build this is, first among the hashes. Only what a version name may
+# be: it reaches a file an update script reads on a customer's machine.
+if [ -n "${release_name:-}" ] ; then
+    write_hash "release" "$(printf '%s' "${release_name}" | tr -cd 'A-Za-z0-9._-')"
+fi
 
 download_datagen "$flavour"
 

@@ -54,7 +54,7 @@ pipeline {
                              file(credentialsId: 'relgen_gpg_key', variable: 'GPG_KEY_FILE'),
                              string(credentialsId: 'relgen_gpg_passphrase', variable: 'GPG_PASSPHRASE')]) {
               sh "echo ${params.FLAVOUR} > .flavour"
-              sh './release.sh --releases-login "${RELEASES_USERNAME}" --releases-password "${RELEASES_PASSWORD}" --gh-login "${GH_USERNAME}" --gh-password "${GH_PASSWORD}" --gpg-key "${GPG_KEY_FILE}" --flavour "$(cat .flavour)" --out out'
+              sh './release.sh --releases-login "${RELEASES_USERNAME}" --releases-password "${RELEASES_PASSWORD}" --gh-login "${GH_USERNAME}" --gh-password "${GH_PASSWORD}" --gpg-key "${GPG_KEY_FILE}" --flavour "$(cat .flavour)" --name "${BRANCH_NAME}-${BUILD_NUMBER}" --out out'
               sh "cp out/release.tar.xz out/${params.FLAVOUR}-${BRANCH_NAME}-${BUILD_NUMBER}.tar.xz"
               sh "cp out/release.tar.xz out/${params.FLAVOUR}-${BRANCH_NAME}-latest.tar.xz"
               // The signature covers release.tar.xz, and the copies above are
