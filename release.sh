@@ -938,6 +938,11 @@ function install_extras() {
     if [ -d extras/systemd ] ; then
         cp -R extras/systemd ${out_dir}/scripts/extras/
     fi
+    # Values the shared scripts take from the flavour, e.g. defaults/portal-url
+    # for configure.sh --portal-token.
+    if [ -d extras/defaults ] ; then
+        cp -R extras/defaults ${out_dir}/scripts/extras/
+    fi
     for helper in extras/*.sh ; do
         [ -f "${helper}" ] || continue
         case "$(basename "${helper}")" in
