@@ -129,14 +129,15 @@ pipeline {
     success {
       sh './ttg/ttg_send_notification --env --ignore-bad -- "${JOB_NAME}/${BUILD_NUMBER} (${FLAVOUR}): PASSED. See details in ${BUILD_URL}"'
       script {
-        // A published midair release on main gets its Docker image too.
-        // midair-docker-release fetches <branch>-latest, reads the concrete
-        // build from the release itself and publishes the image into both
-        // main-<N>/ and main-latest/. Not waited for: the release is done.
+        // A published midair release on main gets its Docker image too:
+        // this very build (<branch>-<N>), into main-<N>/ and, since it is
+        // the latest release, main-latest/. Not waited for: the release is
+        // done.
         if (params.FLAVOUR == 'midair' && env.BRANCH_NAME == 'main') {
           build job: '/midair-docker-release',
                 wait: false,
-                parameters: [string(name: 'MIDAIR_CHANNEL', value: "${env.BRANCH_NAME}-latest")]
+                parameters: [string(name: 'MIDAIR_CHANNEL', value: "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"),
+                             booleanParam(name: 'ALSO_LATEST', value: true)]
         }
       }
     }
